@@ -1,6 +1,6 @@
-# 🍬 Sistema de Controle de Vendas de Doces
+# 🍬 Sistema de Controle de Vendas de Doces (com Banco de Dados SQLite)
 
-Sistema mobile responsivo para controle de vendas de doces, desenvolvido com Flask, HTML, CSS e JavaScript.
+Sistema mobile responsivo para controle de vendas de doces, desenvolvido com **Flask + SQLite**.
 
 ## 📋 Funcionalidades
 
@@ -15,17 +15,17 @@ Sistema mobile responsivo para controle de vendas de doces, desenvolvido com Fla
 
 ## 🚀 Como Executar
 
-1. Instale as dependências:
+### 1. Instale as dependências
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Execute o sistema:
+### 2. Execute o sistema
 ```bash
 python app.py
 ```
 
-3. Acesse no navegador:
+### 3. Acesse no navegador
 ```
 http://localhost:5000
 ```
@@ -34,6 +34,39 @@ http://localhost:5000
 
 - **Usuário:** `admin`
 - **Senha:** `admin123`
+
+## 🗄️ Banco de Dados SQLite
+
+O sistema usa **SQLite** (banco de dados local, não precisa instalar nada extra). O arquivo `doces.db` é criado automaticamente na primeira execução.
+
+### Tabelas criadas automaticamente:
+| Tabela | Descrição |
+|--------|-----------|
+| `produtos` | Produtos cadastrados |
+| `vendas` | Registro de vendas |
+| `fiados` | Contas fiado |
+
+### Para ver os dados no banco (opcional):
+```bash
+# Instale o sqlite3 (se não tiver)
+# No Windows: https://sqlite.org/download.html
+# No Linux: sudo apt install sqlite3
+
+# Acesse o banco
+sqlite3 doces.db
+
+# Veja as tabelas
+.tables
+
+# Veja as vendas
+SELECT * FROM vendas;
+
+# Veja total de vendas do dia
+SELECT SUM(total) FROM vendas WHERE data_iso = date('now');
+
+# Sair
+.quit
+```
 
 ## 📱 Acesso Mobile
 
@@ -54,12 +87,9 @@ http://IP_DO_COMPUTADOR:5000
 
 ```
 sistema_doces/
-├── app.py                 # Aplicação Flask
-├── requirements.txt       # Dependências
-├── data/                  # Dados JSON (criado automaticamente)
-│   ├── produtos.json
-│   ├── vendas.json
-│   └── fiado.json
+├── app.py                 # Aplicação Flask + SQLite
+├── requirements.txt       # Dependências (Flask, Flask-SQLAlchemy)
+├── doces.db               # Banco de dados SQLite (criado auto)
 ├── static/
 │   ├── css/style.css      # Estilos responsivos
 │   └── js/app.js          # JavaScript
@@ -72,6 +102,13 @@ sistema_doces/
     └── fiado.html         # Tela de fiado
 ```
 
-## 💾 Dados
+## 💾 Backup do Banco
 
-Todos os dados são salvos em arquivos JSON na pasta `data/`. Não é necessário banco de dados.
+Para fazer backup, basta copiar o arquivo `doces.db`:
+```bash
+# Windows
+copy doces.db doces_backup_2024.db
+
+# Linux/Mac
+cp doces.db doces_backup_2024.db
+```

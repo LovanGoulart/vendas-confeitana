@@ -1,21 +1,62 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
-import json
-import os
 from functools import wraps
+import os
 
 app = Flask(__name__)
 app.secret_key = 'sistema_doces_2024_seguro'
 
-# Arquivos de dados
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
-os.makedirs(DATA_DIR, exist_ok=True)
+# Configuração do SQLite
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'doces.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-PRODUTOS_FILE = os.path.join(DATA_DIR, 'produtos.json')
-VENDAS_FILE = os.path.join(DATA_DIR, 'vendas.json')
-FIADO_FILE = os.path.join(DATA_DIR, 'fiado.json')
+db = SQLAlchemy(app)
 
-# Credenciais admin (em produção, use hash!)
+# ==================== MODELOS ====================
+
+class Produto(db.Model):
+    __tablename__ = 'produtos'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    preco = db.Column(db.Float, nullable=False)
+    categoria = db.Column(db.String(50), default='')
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class Venda(db.Model):
+    __tablename__ = 'vendas'
+    id = db.Column(db.Integer, primary_key=True)
+    produto_id = db.Column(db.Integer, db.ForeignKey('produtos.id'), nullable=False)
+    produto_nome = db.Column(db.String(100), nullable=False)
+    cliente = db.Column(db.String(100), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    quantidade = db.Column(db.Integer, default=1)
+    total = db.Column(db.Float, nullable=False)
+    data = db.Column(db.String(10), nullable=False)       # dd/mm/yyyy
+    data_iso = db.Column(db.String(10), nullable=False)   # yyyy-mm-dd
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class Fiado(db.Model):
+    __tablename__ = 'fiados'
+    id = db.Column(db.Integer, primary_key=True)
+    cliente = db.Column(db.String(100), nullable=False)
+    produto = db.Column(db.String(100), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    quantidade = db.Column(db.Integer, default=1)
+    total = db.Column(db.Float, nullable=False)
+    data = db.Column(db.String(10), nullable=False)
+    data_iso = db.Column(db.String(10), nullable=False)
+    pago = db.Column(db.Boolean, default=False)
+    data_pagamento = db.Column(db.String(10), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+# Criar tabelas
+with app.app_context():
+    db.create_all()
+
+# Credenciais admin
 ADMIN_USER = 'admin'
 ADMIN_PASS = 'admin123'
 
@@ -26,16 +67,6 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
-
-def load_data(filename):
-    if os.path.exists(filename):
-        with open(filename, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return []
-
-def save_data(filename, data):
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 def get_data_atual_br():
     return datetime.now().strftime('%d/%m/%Y')
@@ -72,7 +103,7 @@ def logout():
 @app.route('/vendas')
 @login_required
 def vendas():
-    produtos = load_data(PRODUTOS_FILE)
+    produtos = Produto.query.filter_by(ativo=True).order_by(Produto.nome).all()
     data_atual = get_data_atual_br()
     data_iso = get_data_atual_iso()
     return render_template('vendas.html', produtos=produtos, data_atual=data_atual, data_iso=data_iso)
@@ -81,53 +112,60 @@ def vendas():
 @login_required
 def api_vendas():
     data = request.get_json()
-    vendas = load_data(VENDAS_FILE)
 
-    venda = {
-        'id': len(vendas) + 1,
-        'produto_id': data.get('produto_id'),
-        'produto_nome': data.get('produto_nome'),
-        'cliente': data.get('cliente'),
-        'valor': float(data.get('valor', 0)),
-        'quantidade': int(data.get('quantidade', 1)),
-        'data': data.get('data'),
-        'data_iso': data.get('data_iso'),
-        'total': float(data.get('valor', 0)) * int(data.get('quantidade', 1)),
-        'tipo': 'venda'
-    }
-    vendas.append(venda)
-    save_data(VENDAS_FILE, vendas)
-    return jsonify({'success': True, 'venda': venda})
+    venda = Venda(
+        produto_id=data.get('produto_id'),
+        produto_nome=data.get('produto_nome'),
+        cliente=data.get('cliente').strip(),
+        valor=float(data.get('valor', 0)),
+        quantidade=int(data.get('quantidade', 1)),
+        total=float(data.get('valor', 0)) * int(data.get('quantidade', 1)),
+        data=data.get('data'),
+        data_iso=data.get('data_iso')
+    )
+    db.session.add(venda)
+    db.session.commit()
+
+    return jsonify({'success': True, 'venda': {
+        'id': venda.id,
+        'produto_nome': venda.produto_nome,
+        'cliente': venda.cliente,
+        'total': venda.total,
+        'quantidade': venda.quantidade
+    }})
 
 @app.route('/produtos')
 @login_required
 def produtos():
-    produtos = load_data(PRODUTOS_FILE)
+    produtos = Produto.query.order_by(Produto.nome).all()
     return render_template('produtos.html', produtos=produtos)
 
 @app.route('/api/produtos', methods=['POST'])
 @login_required
 def api_produtos():
     data = request.get_json()
-    produtos = load_data(PRODUTOS_FILE)
 
-    produto = {
-        'id': len(produtos) + 1,
-        'nome': data.get('nome'),
-        'preco': float(data.get('preco', 0)),
-        'categoria': data.get('categoria', ''),
-        'ativo': True
-    }
-    produtos.append(produto)
-    save_data(PRODUTOS_FILE, produtos)
-    return jsonify({'success': True, 'produto': produto})
+    produto = Produto(
+        nome=data.get('nome').strip(),
+        preco=float(data.get('preco', 0)),
+        categoria=data.get('categoria', '').strip()
+    )
+    db.session.add(produto)
+    db.session.commit()
+
+    return jsonify({'success': True, 'produto': {
+        'id': produto.id,
+        'nome': produto.nome,
+        'preco': produto.preco,
+        'categoria': produto.categoria
+    }})
 
 @app.route('/api/produtos/<int:id>', methods=['DELETE'])
 @login_required
 def delete_produto(id):
-    produtos = load_data(PRODUTOS_FILE)
-    produtos = [p for p in produtos if p['id'] != id]
-    save_data(PRODUTOS_FILE, produtos)
+    produto = Produto.query.get_or_404(id)
+    produto.ativo = False
+    db.session.commit()
     return jsonify({'success': True})
 
 @app.route('/relatorios')
@@ -140,105 +178,92 @@ def relatorios():
 @app.route('/api/relatorios/<data>')
 @login_required
 def api_relatorios(data):
-    vendas = load_data(VENDAS_FILE)
-
-    # Filtrar por data
-    vendas_dia = [v for v in vendas if v.get('data_iso') == data]
+    vendas = Venda.query.filter_by(data_iso=data).all()
 
     # Agrupar por cliente
-    clientes = {}
-    for v in vendas_dia:
-        cliente = v['cliente']
-        if cliente not in clientes:
-            clientes[cliente] = {'total': 0, 'quantidade': 0}
-        clientes[cliente]['total'] += v['total']
-        clientes[cliente]['quantidade'] += v['quantidade']
+    clientes_dict = {}
+    for v in vendas:
+        if v.cliente not in clientes_dict:
+            clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
+        clientes_dict[v.cliente]['total'] += v.total
+        clientes_dict[v.cliente]['quantidade'] += v.quantidade
 
     # Ordenar por valor gasto (maior primeiro)
-    clientes_ordenados = sorted(clientes.items(), key=lambda x: x[1]['total'], reverse=True)
+    clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
 
-    total_dia = sum(v['total'] for v in vendas_dia)
+    total_dia = sum(v.total for v in vendas)
 
     return jsonify({
         'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
         'total_dia': total_dia,
-        'quantidade_vendas': len(vendas_dia)
+        'quantidade_vendas': len(vendas)
     })
 
 @app.route('/api/relatorios/ano/<ano>')
 @login_required
 def api_relatorios_ano(ano):
-    vendas = load_data(VENDAS_FILE)
+    vendas = Venda.query.filter(Venda.data_iso.like(f'{ano}-%')).all()
 
-    # Filtrar por ano
-    vendas_ano = [v for v in vendas if v.get('data_iso', '').startswith(ano)]
+    clientes_dict = {}
+    for v in vendas:
+        if v.cliente not in clientes_dict:
+            clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
+        clientes_dict[v.cliente]['total'] += v.total
+        clientes_dict[v.cliente]['quantidade'] += v.quantidade
 
-    # Agrupar por cliente
-    clientes = {}
-    for v in vendas_ano:
-        cliente = v['cliente']
-        if cliente not in clientes:
-            clientes[cliente] = {'total': 0, 'quantidade': 0}
-        clientes[cliente]['total'] += v['total']
-        clientes[cliente]['quantidade'] += v['quantidade']
-
-    # Ordenar por valor gasto
-    clientes_ordenados = sorted(clientes.items(), key=lambda x: x[1]['total'], reverse=True)
-
-    total_ano = sum(v['total'] for v in vendas_ano)
+    clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
+    total_ano = sum(v.total for v in vendas)
 
     return jsonify({
         'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
         'total_ano': total_ano,
-        'quantidade_vendas': len(vendas_ano)
+        'quantidade_vendas': len(vendas)
     })
 
 @app.route('/fiado')
 @login_required
 def fiado():
-    fiados = load_data(FIADO_FILE)
+    fiados = Fiado.query.order_by(Fiado.created_at.desc()).all()
     return render_template('fiado.html', fiados=fiados)
 
 @app.route('/api/fiado', methods=['POST'])
 @login_required
 def api_fiado():
     data = request.get_json()
-    fiados = load_data(FIADO_FILE)
 
-    fiado = {
-        'id': len(fiados) + 1,
-        'cliente': data.get('cliente'),
-        'produto': data.get('produto'),
-        'valor': float(data.get('valor', 0)),
-        'quantidade': int(data.get('quantidade', 1)),
-        'total': float(data.get('valor', 0)) * int(data.get('quantidade', 1)),
-        'data': data.get('data'),
-        'data_iso': data.get('data_iso'),
-        'pago': False,
-        'data_pagamento': None
-    }
-    fiados.append(fiado)
-    save_data(FIADO_FILE, fiados)
-    return jsonify({'success': True, 'fiado': fiado})
+    fiado = Fiado(
+        cliente=data.get('cliente').strip(),
+        produto=data.get('produto').strip(),
+        valor=float(data.get('valor', 0)),
+        quantidade=int(data.get('quantidade', 1)),
+        total=float(data.get('valor', 0)) * int(data.get('quantidade', 1)),
+        data=data.get('data'),
+        data_iso=data.get('data_iso')
+    )
+    db.session.add(fiado)
+    db.session.commit()
+
+    return jsonify({'success': True, 'fiado': {
+        'id': fiado.id,
+        'cliente': fiado.cliente,
+        'total': fiado.total
+    }})
 
 @app.route('/api/fiado/<int:id>/pagar', methods=['POST'])
 @login_required
 def api_fiado_pagar(id):
-    fiados = load_data(FIADO_FILE)
-    for f in fiados:
-        if f['id'] == id:
-            f['pago'] = True
-            f['data_pagamento'] = get_data_atual_br()
-            break
-    save_data(FIADO_FILE, fiados)
+    fiado = Fiado.query.get_or_404(id)
+    fiado.pago = True
+    fiado.data_pagamento = get_data_atual_br()
+    db.session.commit()
     return jsonify({'success': True})
 
 @app.route('/api/fiado/<int:id>', methods=['DELETE'])
 @login_required
 def delete_fiado(id):
-    fiados = load_data(FIADO_FILE)
-    fiados = [f for f in fiados if f['id'] != id]
-    save_data(FIADO_FILE, fiados)
+    fiado = Fiado.query.get_or_404(id)
+    db.session.delete(fiado)
+    db.session.commit()
     return jsonify({'success': True})
 
 @app.route('/api/busca')
@@ -250,13 +275,17 @@ def api_busca():
     resultados = {'produtos': [], 'clientes': []}
 
     if tipo in ['todos', 'produtos']:
-        produtos = load_data(PRODUTOS_FILE)
-        resultados['produtos'] = [p for p in produtos if termo in p['nome'].lower()]
+        produtos = Produto.query.filter(
+            Produto.nome.ilike(f'%{termo}%'),
+            Produto.ativo == True
+        ).all()
+        resultados['produtos'] = [{'id': p.id, 'nome': p.nome, 'preco': p.preco} for p in produtos]
 
     if tipo in ['todos', 'clientes']:
-        vendas = load_data(VENDAS_FILE)
-        clientes = list(set(v['cliente'] for v in vendas if termo in v['cliente'].lower()))
-        resultados['clientes'] = clientes
+        clientes = db.session.query(Venda.cliente).filter(
+            Venda.cliente.ilike(f'%{termo}%')
+        ).distinct().all()
+        resultados['clientes'] = [c[0] for c in clientes]
 
     return jsonify(resultados)
 
