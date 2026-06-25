@@ -5,13 +5,15 @@ Sistema mobile responsivo para controle de vendas de doces, desenvolvido com **F
 ## 📋 Funcionalidades
 
 - ✅ Login de Administrador
-- 🛒 **Vendas**: Cadastro de vendas com produto, cliente, valor, data e quantidade
+- 🛒 **Vendas**: Cadastro de vendas com produto, cliente, valor, data selecionável e quantidade
+- 💳 **Fiado na tela Vendas**: Marque "Venda Fiado" e vai automaticamente para a tela Fiado
 - 📦 **Produtos**: Cadastro simples de produtos com nome, preço e categoria
-- 💳 **Fiado**: Controle de vendas fiado com pagamento
+- 💳 **Fiado**: Controle de vendas fiado com pagamento e anotação manual
 - 📊 **Relatórios**: 
   - Vendas do dia com ranking de clientes
   - Relatório anual com total e top clientes
   - Busca por data e cliente
+- ➕ **Botão + no menu**: Acesso rápido para nova venda de qualquer tela
 
 ## 🚀 Como Executar
 
@@ -39,32 +41,19 @@ http://localhost:5000
 
 O sistema usa **SQLite** (banco de dados local, não precisa instalar nada extra). O arquivo `doces.db` é criado automaticamente na primeira execução.
 
-### Tabelas criadas automaticamente:
+### Tabelas:
 | Tabela | Descrição |
 |--------|-----------|
 | `produtos` | Produtos cadastrados |
-| `vendas` | Registro de vendas |
-| `fiados` | Contas fiado |
+| `vendas` | Registro de todas as vendas (inclui fiado) |
+| `fiados` | Contas fiado em aberto/pagas |
 
-### Para ver os dados no banco (opcional):
+### Para ver os dados no banco:
 ```bash
-# Instale o sqlite3 (se não tiver)
-# No Windows: https://sqlite.org/download.html
-# No Linux: sudo apt install sqlite3
-
-# Acesse o banco
 sqlite3 doces.db
-
-# Veja as tabelas
 .tables
-
-# Veja as vendas
 SELECT * FROM vendas;
-
-# Veja total de vendas do dia
-SELECT SUM(total) FROM vendas WHERE data_iso = date('now');
-
-# Sair
+SELECT * FROM fiados;
 .quit
 ```
 
@@ -87,28 +76,17 @@ http://IP_DO_COMPUTADOR:5000
 
 ```
 sistema_doces/
-├── app.py                 # Aplicação Flask + SQLite
-├── requirements.txt       # Dependências (Flask, Flask-SQLAlchemy)
-├── doces.db               # Banco de dados SQLite (criado auto)
+├── app.py                 # Flask + SQLite
+├── requirements.txt       # Flask, Flask-SQLAlchemy
+├── doces.db               # Banco SQLite (criado auto)
 ├── static/
 │   ├── css/style.css      # Estilos responsivos
 │   └── js/app.js          # JavaScript
 └── templates/
-    ├── base.html          # Template base
-    ├── login.html         # Tela de login
-    ├── vendas.html        # Tela de vendas
-    ├── produtos.html      # Tela de produtos
-    ├── relatorios.html    # Tela de relatórios
-    └── fiado.html         # Tela de fiado
-```
-
-## 💾 Backup do Banco
-
-Para fazer backup, basta copiar o arquivo `doces.db`:
-```bash
-# Windows
-copy doces.db doces_backup_2024.db
-
-# Linux/Mac
-cp doces.db doces_backup_2024.db
+    ├── base.html          # Menu com botão +
+    ├── login.html         # Login
+    ├── vendas.html        # Vendas + data selecionável + fiado
+    ├── produtos.html      # Produtos
+    ├── relatorios.html    # Relatórios
+    └── fiado.html         # Fiado manual + fiado da venda
 ```

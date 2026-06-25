@@ -15,7 +15,7 @@
     </div>
     <div class="form-group">
         <label>💰 Preço (R$)</label>
-        <input type="number" id="precoProduto" step="0.01" placeholder="0,00">
+        <input type="text" id="precoProduto" placeholder="0,00" oninput="formatarInputMoeda(this)">
     </div>
     <div class="form-group">
         <label>📁 Categoria</label>
@@ -37,7 +37,7 @@
                 <span class="categoria">{{ produto.categoria }}</span>
             </div>
             <div class="produto-actions">
-                <span class="preco">R$ {{ "%.2f"|format(produto.preco) }}</span>
+                <span class="preco">R$ {{ produto.preco|moeda_br }}</span>
                 <button class="btn-icon" onclick="excluirProduto({{ produto.id }})">🗑️</button>
             </div>
         </div>
@@ -50,12 +50,29 @@
 
 {% block scripts %}
 <script>
+function formatarInputMoeda(input) {
+    let valor = input.value.replace(/[^\d,]/g, "").replace(/\./g, "");
+    if (valor.includes(",")) {
+        let partes = valor.split(",");
+        if (partes[1] && partes[1].length > 2) {
+            partes[1] = partes[1].substring(0, 2);
+            valor = partes.join(",");
+        }
+    }
+    input.value = valor;
+}
+
+function parseBr(valorStr) {
+    if (!valorStr) return 0;
+    return parseFloat(valorStr.replace(/\./g, "").replace(",", "."));
+}
+
 function salvarProduto() {
     const nome = document.getElementById('nomeProduto').value.trim();
-    const preco = document.getElementById('precoProduto').value;
+    const preco = parseBr(document.getElementById('precoProduto').value);
     const categoria = document.getElementById('categoriaProduto').value.trim();
 
-    if (!nome || !preco) {
+    if (!nome || preco <= 0) {
         alert('Preencha o nome e o preço!');
         return;
     }

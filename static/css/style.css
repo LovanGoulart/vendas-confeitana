@@ -54,6 +54,33 @@ body {
     color: var(--primary);
 }
 
+.menu-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-nova-venda {
+    background: var(--success);
+    color: var(--white);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 1.3rem;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(46, 204, 113, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-nova-venda:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(46, 204, 113, 0.5);
+}
+
 .menu-toggle {
     background: none;
     border: none;
@@ -228,16 +255,59 @@ body {
     gap: 12px;
 }
 
+/* ===== CHECKBOX FIADO ===== */
+.checkbox-group {
+    margin: 20px 0;
+}
+
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    font-size: 1rem !important;
+    color: var(--dark) !important;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+.checkmark {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--warning);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.checkbox-label input:checked + .checkmark {
+    background: var(--warning);
+    border-color: var(--warning);
+}
+
+.checkbox-label input:checked + .checkmark::after {
+    content: '✓';
+    color: var(--white);
+    font-size: 14px;
+    font-weight: bold;
+}
+
 /* ===== BOTÕES ===== */
 .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 12px 20px;
+    padding: 14px 20px;
     border: none;
-    border-radius: 8px;
-    font-size: 0.95rem;
+    border-radius: 10px;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;

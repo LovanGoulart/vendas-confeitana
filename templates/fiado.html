@@ -8,7 +8,7 @@
 </div>
 
 <div class="card">
-    <h3>➕ Anotar Fiado</h3>
+    <h3>➕ Anotar Fiado Manual</h3>
     <div class="form-group">
         <label>👤 Nome do Cliente</label>
         <input type="text" id="clienteFiado" placeholder="Nome do cliente">
@@ -20,7 +20,7 @@
     <div class="form-row">
         <div class="form-group">
             <label>💰 Valor Unitário (R$)</label>
-            <input type="number" id="valorFiado" step="0.01" placeholder="0,00" oninput="calcularTotalFiado()">
+            <input type="text" id="valorFiado" placeholder="0,00" oninput="formatarInputMoeda(this); calcularTotalFiado()">
         </div>
         <div class="form-group">
             <label>🔢 Quantidade</label>
@@ -43,9 +43,11 @@
         <input type="text" id="buscaFiado" placeholder="🔍 Buscar cliente..." onkeyup="filtrarFiado()">
     </div>
     <h3>📋 Contas em Aberto</h3>
-    <div id="listaFiado" class="lista-fiado">
+    <div id="listaFiadoAberto" class="lista-fiado">
+        {% set tem_aberto = false %}
         {% for fiado in fiados %}
         {% if not fiado.pago %}
+        {% set tem_aberto = true %}
         <div class="fiado-item" data-cliente="{{ fiado.cliente.lower() }}">
             <div class="fiado-info">
                 <strong>{{ fiado.cliente }}</strong>
@@ -53,59 +55,84 @@
                 <span class="fiado-data">{{ fiado.data }}</span>
             </div>
             <div class="fiado-actions">
-                <span class="fiado-valor">R$ {{ "%.2f"|format(fiado.total) }}</span>
+                <span class="fiado-valor">R$ {{ fiado.total|moeda_br }}</span>
                 <button class="btn-icon btn-success" onclick="pagarFiado({{ fiado.id }})">💰 Pagar</button>
                 <button class="btn-icon" onclick="excluirFiado({{ fiado.id }})">🗑️</button>
             </div>
         </div>
         {% endif %}
-        {% else %}
-        <p class="empty">Nenhuma conta em aberto</p>
         {% endfor %}
+        {% if not tem_aberto %}
+        <p class="empty">Nenhuma conta em aberto</p>
+        {% endif %}
     </div>
 </div>
 
 <div class="card">
     <h3>✅ Contas Pagas</h3>
     <div class="lista-fiado">
+        {% set tem_pago = false %}
         {% for fiado in fiados %}
         {% if fiado.pago %}
-        <div class="fiado-item pago">
+        {% set tem_pago = true %}
+        <div class="fiado-item pago" data-cliente="{{ fiado.cliente.lower() }}">
             <div class="fiado-info">
                 <strong>{{ fiado.cliente }}</strong>
                 <span>{{ fiado.produto }} - {{ fiado.quantidade }}x</span>
                 <span class="fiado-data">Pago em: {{ fiado.data_pagamento }}</span>
             </div>
             <div class="fiado-actions">
-                <span class="fiado-valor">R$ {{ "%.2f"|format(fiado.total) }}</span>
+                <span class="fiado-valor">R$ {{ fiado.total|moeda_br }}</span>
                 <span class="badge-pago">✓ Pago</span>
             </div>
         </div>
         {% endif %}
-        {% else %}
-        <p class="empty">Nenhuma conta paga</p>
         {% endfor %}
+        {% if not tem_pago %}
+        <p class="empty">Nenhuma conta paga</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+function formatarInputMoeda(input) {
+    let valor = input.value.replace(/[^\d,]/g, "").replace(/\./g, "");
+    if (valor.includes(",")) {
+        let partes = valor.split(",");
+        if (partes[1] && partes[1].length > 2) {
+            partes[1] = partes[1].substring(0, 2);
+            valor = partes.join(",");
+        }
+    }
+    input.value = valor;
+}
+
+function parseBr(valorStr) {
+    if (!valorStr) return 0;
+    return parseFloat(valorStr.replace(/\./g, "").replace(",", "."));
+}
+
+function formatarBr(valor) {
+    return valor.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 function calcularTotalFiado() {
-    const valor = parseFloat(document.getElementById('valorFiado').value) || 0;
+    const valor = parseBr(document.getElementById('valorFiado').value);
     const qtd = parseInt(document.getElementById('quantidadeFiado').value) || 0;
     const total = valor * qtd;
-    document.getElementById('totalFiado').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+    document.getElementById('totalFiado').textContent = 'R$ ' + formatarBr(total);
 }
 
 function salvarFiado() {
     const cliente = document.getElementById('clienteFiado').value.trim();
     const produto = document.getElementById('produtoFiado').value.trim();
-    const valor = document.getElementById('valorFiado').value;
+    const valor = parseBr(document.getElementById('valorFiado').value);
     const quantidade = document.getElementById('quantidadeFiado').value;
     const data = document.getElementById('dataFiado').value;
 
-    if (!cliente || !produto || !valor || !data) {
+    if (!cliente || !produto || valor <= 0 || !data) {
         alert('Preencha todos os campos!');
         return;
     }

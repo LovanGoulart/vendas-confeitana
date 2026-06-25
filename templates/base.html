@@ -11,7 +11,10 @@
     <nav class="menu-topo">
         <div class="menu-container">
             <div class="logo">🍬 Doces</div>
-            <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+            <div class="menu-right">
+                <a href="{{ url_for('vendas') }}" class="btn-nova-venda" title="Nova Venda">➕</a>
+                <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+            </div>
             <ul class="menu-list" id="menuList">
                 <li><a href="{{ url_for('vendas') }}" class="{% if request.endpoint == 'vendas' %}active{% endif %}">🛒 Vendas</a></li>
                 <li><a href="{{ url_for('produtos') }}" class="{% if request.endpoint == 'produtos' %}active{% endif %}">📦 Produtos</a></li>

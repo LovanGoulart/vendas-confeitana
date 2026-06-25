@@ -34,8 +34,9 @@ class Venda(db.Model):
     valor = db.Column(db.Float, nullable=False)
     quantidade = db.Column(db.Integer, default=1)
     total = db.Column(db.Float, nullable=False)
-    data = db.Column(db.String(10), nullable=False)       # dd/mm/yyyy
-    data_iso = db.Column(db.String(10), nullable=False)   # yyyy-mm-dd
+    data = db.Column(db.String(10), nullable=False)
+    data_iso = db.Column(db.String(10), nullable=False)
+    is_fiado = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 class Fiado(db.Model):
@@ -56,7 +57,6 @@ class Fiado(db.Model):
 with app.app_context():
     db.create_all()
 
-# Credenciais admin
 ADMIN_USER = 'admin'
 ADMIN_PASS = 'admin123'
 
@@ -73,6 +73,15 @@ def get_data_atual_br():
 
 def get_data_atual_iso():
     return datetime.now().strftime('%Y-%m-%d')
+
+def formatar_br(valor):
+    """Converte float para formato BR: 5.0 -> '5,00'"""
+    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+# Filtro Jinja para formatar moeda
+@app.template_filter('moeda_br')
+def moeda_br_filter(valor):
+    return formatar_br(valor)
 
 # ==================== ROTAS ====================
 
@@ -112,7 +121,9 @@ def vendas():
 @login_required
 def api_vendas():
     data = request.get_json()
+    is_fiado = data.get('fiado', False)
 
+    # Criar venda (sempre, fiado ou não)
     venda = Venda(
         produto_id=data.get('produto_id'),
         produto_nome=data.get('produto_nome'),
@@ -121,9 +132,26 @@ def api_vendas():
         quantidade=int(data.get('quantidade', 1)),
         total=float(data.get('valor', 0)) * int(data.get('quantidade', 1)),
         data=data.get('data'),
-        data_iso=data.get('data_iso')
+        data_iso=data.get('data_iso'),
+        is_fiado=is_fiado
     )
     db.session.add(venda)
+    db.session.flush()
+
+    # Se for fiado, criar também na tabela fiado
+    if is_fiado:
+        fiado = Fiado(
+            cliente=data.get('cliente').strip(),
+            produto=data.get('produto_nome'),
+            valor=float(data.get('valor', 0)),
+            quantidade=int(data.get('quantidade', 1)),
+            total=float(data.get('valor', 0)) * int(data.get('quantidade', 1)),
+            data=data.get('data'),
+            data_iso=data.get('data_iso'),
+            pago=False
+        )
+        db.session.add(fiado)
+
     db.session.commit()
 
     return jsonify({'success': True, 'venda': {
@@ -131,7 +159,8 @@ def api_vendas():
         'produto_nome': venda.produto_nome,
         'cliente': venda.cliente,
         'total': venda.total,
-        'quantidade': venda.quantidade
+        'quantidade': venda.quantidade,
+        'fiado': is_fiado
     }})
 
 @app.route('/produtos')
@@ -178,9 +207,9 @@ def relatorios():
 @app.route('/api/relatorios/<data>')
 @login_required
 def api_relatorios(data):
+    # TODAS as vendas do dia (inclui fiado) - fiado TAMBÉM é venda
     vendas = Venda.query.filter_by(data_iso=data).all()
 
-    # Agrupar por cliente
     clientes_dict = {}
     for v in vendas:
         if v.cliente not in clientes_dict:
@@ -188,9 +217,7 @@ def api_relatorios(data):
         clientes_dict[v.cliente]['total'] += v.total
         clientes_dict[v.cliente]['quantidade'] += v.quantidade
 
-    # Ordenar por valor gasto (maior primeiro)
     clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
-
     total_dia = sum(v.total for v in vendas)
 
     return jsonify({
@@ -202,6 +229,7 @@ def api_relatorios(data):
 @app.route('/api/relatorios/ano/<ano>')
 @login_required
 def api_relatorios_ano(ano):
+    # TODAS as vendas do ano (inclui fiado)
     vendas = Venda.query.filter(Venda.data_iso.like(f'{ano}-%')).all()
 
     clientes_dict = {}

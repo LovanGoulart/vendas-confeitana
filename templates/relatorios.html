@@ -67,6 +67,10 @@
 
 {% block scripts %}
 <script>
+function formatarBr(valor) {
+    return valor.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 function carregarRelatorio() {
     const data = document.getElementById('dataRelatorio').value;
     if (!data) {
@@ -77,7 +81,7 @@ function carregarRelatorio() {
     fetch('/api/relatorios/' + data)
     .then(r => r.json())
     .then(data => {
-        document.getElementById('totalDia').textContent = 'R$ ' + data.total_dia.toFixed(2).replace('.', ',');
+        document.getElementById('totalDia').textContent = 'R$ ' + formatarBr(data.total_dia);
         document.getElementById('qtdVendas').textContent = data.quantidade_vendas;
 
         const container = document.getElementById('listaClientesDia');
@@ -94,7 +98,7 @@ function carregarRelatorio() {
                     <strong>${c.nome}</strong>
                     <span>${c.quantidade} item(s)</span>
                 </div>
-                <div class="cliente-valor">R$ ${c.total.toFixed(2).replace('.', ',')}</div>
+                <div class="cliente-valor">R$ ${formatarBr(c.total)}</div>
             </div>`;
         });
         container.innerHTML = html;
@@ -107,7 +111,7 @@ function carregarRelatorioAno() {
     fetch('/api/relatorios/ano/' + ano)
     .then(r => r.json())
     .then(data => {
-        document.getElementById('totalAno').textContent = 'R$ ' + data.total_ano.toFixed(2).replace('.', ',');
+        document.getElementById('totalAno').textContent = 'R$ ' + formatarBr(data.total_ano);
         document.getElementById('qtdVendasAno').textContent = data.quantidade_vendas;
 
         const container = document.getElementById('listaClientesAno');
@@ -124,7 +128,7 @@ function carregarRelatorioAno() {
                     <strong>${c.nome}</strong>
                     <span>${c.quantidade} item(s)</span>
                 </div>
-                <div class="cliente-valor">R$ ${c.total.toFixed(2).replace('.', ',')}</div>
+                <div class="cliente-valor">R$ ${formatarBr(c.total)}</div>
             </div>`;
         });
         container.innerHTML = html;
