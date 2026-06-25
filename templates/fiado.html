@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Fiado - Doces Vendas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>💳 Vendas Fiado</h2>
+</div>
+
+<div class="card">
+    <h3>➕ Anotar Fiado</h3>
+    <div class="form-group">
+        <label>👤 Nome do Cliente</label>
+        <input type="text" id="clienteFiado" placeholder="Nome do cliente">
+    </div>
+    <div class="form-group">
+        <label>📦 Produto</label>
+        <input type="text" id="produtoFiado" placeholder="Nome do produto">
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>💰 Valor Unitário (R$)</label>
+            <input type="number" id="valorFiado" step="0.01" placeholder="0,00" oninput="calcularTotalFiado()">
+        </div>
+        <div class="form-group">
+            <label>🔢 Quantidade</label>
+            <input type="number" id="quantidadeFiado" value="1" min="1" oninput="calcularTotalFiado()">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>📅 Data</label>
+        <input type="date" id="dataFiado" value="{{ data_iso if data_iso else '' }}">
+    </div>
+    <div class="total-preview">
+        <span>Total:</span>
+        <strong id="totalFiado">R$ 0,00</strong>
+    </div>
+    <button class="btn btn-warning btn-full" onclick="salvarFiado()">💾 Anotar Fiado</button>
+</div>
+
+<div class="card">
+    <div class="busca-container">
+        <input type="text" id="buscaFiado" placeholder="🔍 Buscar cliente..." onkeyup="filtrarFiado()">
+    </div>
+    <h3>📋 Contas em Aberto</h3>
+    <div id="listaFiado" class="lista-fiado">
+        {% for fiado in fiados %}
+        {% if not fiado.pago %}
+        <div class="fiado-item" data-cliente="{{ fiado.cliente.lower() }}">
+            <div class="fiado-info">
+                <strong>{{ fiado.cliente }}</strong>
+                <span>{{ fiado.produto }} - {{ fiado.quantidade }}x</span>
+                <span class="fiado-data">{{ fiado.data }}</span>
+            </div>
+            <div class="fiado-actions">
+                <span class="fiado-valor">R$ {{ "%.2f"|format(fiado.total) }}</span>
+                <button class="btn-icon btn-success" onclick="pagarFiado({{ fiado.id }})">💰 Pagar</button>
+                <button class="btn-icon" onclick="excluirFiado({{ fiado.id }})">🗑️</button>
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="empty">Nenhuma conta em aberto</p>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <h3>✅ Contas Pagas</h3>
+    <div class="lista-fiado">
+        {% for fiado in fiados %}
+        {% if fiado.pago %}
+        <div class="fiado-item pago">
+            <div class="fiado-info">
+                <strong>{{ fiado.cliente }}</strong>
+                <span>{{ fiado.produto }} - {{ fiado.quantidade }}x</span>
+                <span class="fiado-data">Pago em: {{ fiado.data_pagamento }}</span>
+            </div>
+            <div class="fiado-actions">
+                <span class="fiado-valor">R$ {{ "%.2f"|format(fiado.total) }}</span>
+                <span class="badge-pago">✓ Pago</span>
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="empty">Nenhuma conta paga</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcularTotalFiado() {
+    const valor = parseFloat(document.getElementById('valorFiado').value) || 0;
+    const qtd = parseInt(document.getElementById('quantidadeFiado').value) || 0;
+    const total = valor * qtd;
+    document.getElementById('totalFiado').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+}
+
+function salvarFiado() {
+    const cliente = document.getElementById('clienteFiado').value.trim();
+    const produto = document.getElementById('produtoFiado').value.trim();
+    const valor = document.getElementById('valorFiado').value;
+    const quantidade = document.getElementById('quantidadeFiado').value;
+    const data = document.getElementById('dataFiado').value;
+
+    if (!cliente || !produto || !valor || !data) {
+        alert('Preencha todos os campos!');
+        return;
+    }
+
+    const partes = data.split('-');
+    const dataBr = partes[2] + '/' + partes[1] + '/' + partes[0];
+
+    fetch('/api/fiado', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({cliente, produto, valor, quantidade, data: dataBr, data_iso: data})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Fiado anotado!');
+            location.reload();
+        }
+    });
+}
+
+function pagarFiado(id) {
+    if (!confirm('Confirmar pagamento?')) return;
+
+    fetch('/api/fiado/' + id + '/pagar', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+    });
+}
+
+function excluirFiado(id) {
+    if (!confirm('Tem certeza?')) return;
+
+    fetch('/api/fiado/' + id, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+    });
+}
+
+function filtrarFiado() {
+    const termo = document.getElementById('buscaFiado').value.toLowerCase();
+    document.querySelectorAll('.fiado-item[data-cliente]').forEach(item => {
+        const cliente = item.dataset.cliente;
+        item.style.display = cliente.includes(termo) ? 'flex' : 'none';
+    });
+}
+</script>
+{% endblock %}

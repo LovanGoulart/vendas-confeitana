@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Produtos - Doces Vendas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📦 Produtos</h2>
+</div>
+
+<div class="card">
+    <h3>➕ Cadastrar Produto</h3>
+    <div class="form-group">
+        <label>🏷️ Nome do Produto</label>
+        <input type="text" id="nomeProduto" placeholder="Ex: Brigadeiro, Beijinho...">
+    </div>
+    <div class="form-group">
+        <label>💰 Preço (R$)</label>
+        <input type="number" id="precoProduto" step="0.01" placeholder="0,00">
+    </div>
+    <div class="form-group">
+        <label>📁 Categoria</label>
+        <input type="text" id="categoriaProduto" placeholder="Ex: Doces, Salgados, Bebidas...">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="salvarProduto()">💾 Salvar Produto</button>
+</div>
+
+<div class="card">
+    <div class="busca-container">
+        <input type="text" id="buscaProduto" placeholder="🔍 Buscar produtos..." onkeyup="filtrarProdutos()">
+    </div>
+    <h3>📋 Lista de Produtos</h3>
+    <div id="listaProdutos" class="lista-produtos">
+        {% for produto in produtos %}
+        <div class="produto-item" data-nome="{{ produto.nome.lower() }}">
+            <div class="produto-info">
+                <strong>{{ produto.nome }}</strong>
+                <span class="categoria">{{ produto.categoria }}</span>
+            </div>
+            <div class="produto-actions">
+                <span class="preco">R$ {{ "%.2f"|format(produto.preco) }}</span>
+                <button class="btn-icon" onclick="excluirProduto({{ produto.id }})">🗑️</button>
+            </div>
+        </div>
+        {% else %}
+        <p class="empty">Nenhum produto cadastrado</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function salvarProduto() {
+    const nome = document.getElementById('nomeProduto').value.trim();
+    const preco = document.getElementById('precoProduto').value;
+    const categoria = document.getElementById('categoriaProduto').value.trim();
+
+    if (!nome || !preco) {
+        alert('Preencha o nome e o preço!');
+        return;
+    }
+
+    fetch('/api/produtos', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({nome, preco, categoria})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Produto cadastrado!');
+            location.reload();
+        }
+    });
+}
+
+function excluirProduto(id) {
+    if (!confirm('Tem certeza que deseja excluir?')) return;
+
+    fetch('/api/produtos/' + id, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+    });
+}
+
+function filtrarProdutos() {
+    const termo = document.getElementById('buscaProduto').value.toLowerCase();
+    document.querySelectorAll('.produto-item').forEach(item => {
+        const nome = item.dataset.nome;
+        item.style.display = nome.includes(termo) ? 'flex' : 'none';
+    });
+}
+</script>
+{% endblock %}

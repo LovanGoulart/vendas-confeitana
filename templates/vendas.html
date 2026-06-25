@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Vendas - Doces Vendas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🛒 Nova Venda</h2>
+    <p class="data-atual">📅 {{ data_atual }}</p>
+</div>
+
+<div class="card">
+    <div class="busca-container">
+        <input type="text" id="buscaProduto" placeholder="🔍 Buscar produto..." onkeyup="buscarProdutos()">
+    </div>
+
+    <div class="form-group">
+        <label>📦 Produto</label>
+        <select id="produtoSelect" onchange="atualizarPreco()">
+            <option value="">Selecione um produto</option>
+            {% for produto in produtos %}
+            <option value="{{ produto.id }}" data-preco="{{ produto.preco }}" data-nome="{{ produto.nome }}">
+                {{ produto.nome }} - R$ {{ "%.2f"|format(produto.preco) }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>💰 Valor Unitário (R$)</label>
+            <input type="number" id="valorVenda" step="0.01" placeholder="0,00">
+        </div>
+        <div class="form-group">
+            <label>🔢 Quantidade</label>
+            <input type="number" id="quantidadeVenda" value="1" min="1">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>👤 Nome do Cliente</label>
+        <input type="text" id="clienteVenda" placeholder="Nome do cliente">
+    </div>
+
+    <div class="form-group">
+        <label>📅 Data</label>
+        <input type="text" id="dataVenda" value="{{ data_atual }}" readonly>
+        <input type="hidden" id="dataIso" value="{{ data_iso }}">
+    </div>
+
+    <div class="total-preview">
+        <span>Total:</span>
+        <strong id="totalVenda">R$ 0,00</strong>
+    </div>
+
+    <button class="btn btn-success btn-full" onclick="salvarVenda()">✅ Confirmar Venda</button>
+</div>
+
+<div class="card">
+    <h3>📝 Vendas de Hoje</h3>
+    <div id="listaVendasHoje" class="lista-vendas">
+        <p class="empty">Carregando...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function atualizarPreco() {
+    const select = document.getElementById('produtoSelect');
+    const option = select.options[select.selectedIndex];
+    if (option.value) {
+        document.getElementById('valorVenda').value = option.dataset.preco;
+        calcularTotal();
+    }
+}
+
+function calcularTotal() {
+    const valor = parseFloat(document.getElementById('valorVenda').value) || 0;
+    const qtd = parseInt(document.getElementById('quantidadeVenda').value) || 0;
+    const total = valor * qtd;
+    document.getElementById('totalVenda').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+}
+
+document.getElementById('valorVenda').addEventListener('input', calcularTotal);
+document.getElementById('quantidadeVenda').addEventListener('input', calcularTotal);
+
+function buscarProdutos() {
+    const termo = document.getElementById('buscaProduto').value.toLowerCase();
+    const select = document.getElementById('produtoSelect');
+    for (let i = 1; i < select.options.length; i++) {
+        const texto = select.options[i].text.toLowerCase();
+        select.options[i].style.display = texto.includes(termo) ? '' : 'none';
+    }
+}
+
+function salvarVenda() {
+    const select = document.getElementById('produtoSelect');
+    const option = select.options[select.selectedIndex];
+
+    if (!option.value) {
+        alert('Selecione um produto!');
+        return;
+    }
+
+    const cliente = document.getElementById('clienteVenda').value.trim();
+    if (!cliente) {
+        alert('Digite o nome do cliente!');
+        return;
+    }
+
+    const dados = {
+        produto_id: option.value,
+        produto_nome: option.dataset.nome,
+        cliente: cliente,
+        valor: document.getElementById('valorVenda').value,
+        quantidade: document.getElementById('quantidadeVenda').value,
+        data: document.getElementById('dataVenda').value,
+        data_iso: document.getElementById('dataIso').value
+    };
+
+    fetch('/api/vendas', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(dados)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Venda registrada com sucesso!');
+            document.getElementById('clienteVenda').value = '';
+            document.getElementById('quantidadeVenda').value = '1';
+            document.getElementById('valorVenda').value = '';
+            select.selectedIndex = 0;
+            calcularTotal();
+            carregarVendasHoje();
+        }
+    });
+}
+
+function carregarVendasHoje() {
+    const dataIso = document.getElementById('dataIso').value;
+    fetch('/api/relatorios/' + dataIso)
+    .then(r => r.json())
+    .then(data => {
+        const container = document.getElementById('listaVendasHoje');
+        if (data.clientes.length === 0) {
+            container.innerHTML = '<p class="empty">Nenhuma venda hoje</p>';
+            return;
+        }
+
+        let html = '';
+        data.clientes.forEach(c => {
+            html += `<div class="venda-item">
+                <div class="venda-info">
+                    <strong>${c.nome}</strong>
+                    <span>${c.quantidade} item(s)</span>
+                </div>
+                <div class="venda-valor">R$ ${c.total.toFixed(2).replace('.', ',')}</div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    });
+}
+
+carregarVendasHoje();
+</script>
+{% endblock %}

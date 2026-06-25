@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios - Doces Vendas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📊 Relatórios</h2>
+    <p class="data-atual">📅 {{ data_atual }}</p>
+</div>
+
+<div class="card">
+    <h3>🔍 Buscar Vendas</h3>
+    <div class="form-group">
+        <label>📅 Selecionar Data</label>
+        <input type="date" id="dataRelatorio" value="{{ data_iso }}">
+    </div>
+    <div class="busca-container">
+        <input type="text" id="buscaCliente" placeholder="🔍 Buscar cliente..." onkeyup="buscarCliente()">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="carregarRelatorio()">📋 Gerar Relatório</button>
+</div>
+
+<div class="card">
+    <h3>📈 Resumo do Dia</h3>
+    <div class="resumo-grid">
+        <div class="resumo-item">
+            <span class="resumo-label">💰 Total do Dia</span>
+            <span class="resumo-valor" id="totalDia">R$ 0,00</span>
+        </div>
+        <div class="resumo-item">
+            <span class="resumo-label">🛒 Vendas</span>
+            <span class="resumo-valor" id="qtdVendas">0</span>
+        </div>
+    </div>
+
+    <h4>👥 Clientes (Maiores Compradores)</h4>
+    <div id="listaClientesDia" class="lista-clientes">
+        <p class="empty">Selecione uma data</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📊 Resumo do Ano</h3>
+    <div class="form-group">
+        <label>📅 Ano</label>
+        <input type="number" id="anoRelatorio" value="2026" min="2020" max="2030">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="carregarRelatorioAno()">📋 Gerar Relatório Anual</button>
+
+    <div class="resumo-grid" style="margin-top: 15px;">
+        <div class="resumo-item">
+            <span class="resumo-label">💰 Total do Ano</span>
+            <span class="resumo-valor" id="totalAno">R$ 0,00</span>
+        </div>
+        <div class="resumo-item">
+            <span class="resumo-label">🛒 Vendas</span>
+            <span class="resumo-valor" id="qtdVendasAno">0</span>
+        </div>
+    </div>
+
+    <h4>👥 Top Clientes do Ano</h4>
+    <div id="listaClientesAno" class="lista-clientes">
+        <p class="empty">Clique em gerar relatório</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function carregarRelatorio() {
+    const data = document.getElementById('dataRelatorio').value;
+    if (!data) {
+        alert('Selecione uma data!');
+        return;
+    }
+
+    fetch('/api/relatorios/' + data)
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('totalDia').textContent = 'R$ ' + data.total_dia.toFixed(2).replace('.', ',');
+        document.getElementById('qtdVendas').textContent = data.quantidade_vendas;
+
+        const container = document.getElementById('listaClientesDia');
+        if (data.clientes.length === 0) {
+            container.innerHTML = '<p class="empty">Nenhuma venda nesta data</p>';
+            return;
+        }
+
+        let html = '';
+        data.clientes.forEach((c, i) => {
+            html += `<div class="cliente-item">
+                <div class="cliente-rank">${i + 1}º</div>
+                <div class="cliente-info">
+                    <strong>${c.nome}</strong>
+                    <span>${c.quantidade} item(s)</span>
+                </div>
+                <div class="cliente-valor">R$ ${c.total.toFixed(2).replace('.', ',')}</div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    });
+}
+
+function carregarRelatorioAno() {
+    const ano = document.getElementById('anoRelatorio').value;
+
+    fetch('/api/relatorios/ano/' + ano)
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('totalAno').textContent = 'R$ ' + data.total_ano.toFixed(2).replace('.', ',');
+        document.getElementById('qtdVendasAno').textContent = data.quantidade_vendas;
+
+        const container = document.getElementById('listaClientesAno');
+        if (data.clientes.length === 0) {
+            container.innerHTML = '<p class="empty">Nenhuma venda neste ano</p>';
+            return;
+        }
+
+        let html = '';
+        data.clientes.forEach((c, i) => {
+            html += `<div class="cliente-item">
+                <div class="cliente-rank">${i + 1}º</div>
+                <div class="cliente-info">
+                    <strong>${c.nome}</strong>
+                    <span>${c.quantidade} item(s)</span>
+                </div>
+                <div class="cliente-valor">R$ ${c.total.toFixed(2).replace('.', ',')}</div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    });
+}
+
+function buscarCliente() {
+    const termo = document.getElementById('buscaCliente').value.toLowerCase();
+    document.querySelectorAll('.cliente-item').forEach(item => {
+        const nome = item.querySelector('strong').textContent.toLowerCase();
+        item.style.display = nome.includes(termo) ? 'flex' : 'none';
+    });
+}
+
+// Carregar relatório do dia atual ao abrir
+carregarRelatorio();
+</script>
+{% endblock %}
