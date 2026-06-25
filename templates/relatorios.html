@@ -12,12 +12,11 @@
     <h3>🔍 Buscar Vendas</h3>
     <div class="form-group">
         <label>📅 Selecionar Data</label>
-        <input type="date" id="dataRelatorio" value="{{ data_iso }}">
+        <input type="date" id="dataRelatorio" value="{{ data_iso }}" onchange="carregarRelatorio()">
     </div>
     <div class="busca-container">
         <input type="text" id="buscaCliente" placeholder="🔍 Buscar cliente..." onkeyup="buscarCliente()">
     </div>
-    <button class="btn btn-primary btn-full" onclick="carregarRelatorio()">📋 Gerar Relatório</button>
 </div>
 
 <div class="card">

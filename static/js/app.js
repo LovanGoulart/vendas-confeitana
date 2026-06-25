@@ -4,7 +4,7 @@ function toggleMenu() {
 }
 
 // Fechar menu ao clicar em link
- document.querySelectorAll('.menu-list a').forEach(link => {
+document.querySelectorAll('.menu-list a').forEach(link => {
     link.addEventListener('click', () => {
         document.getElementById('menuList').classList.remove('active');
     });
@@ -29,3 +29,15 @@ setTimeout(() => {
         setTimeout(() => alert.remove(), 500);
     });
 }, 3000);
+
+// Scroll top button
+const scrollTopBtn = document.querySelector('.scroll-top');
+if (scrollTopBtn) {
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 300) {
+            scrollTopBtn.classList.add('visible');
+        } else {
+            scrollTopBtn.classList.remove('visible');
+        }
+    });
+}
