@@ -627,6 +627,18 @@ body {
     border: 1px solid #F5B7B1;
 }
 
+/* ===== INPUTS DE DATA ===== */
+.form-row .form-group input[type="date"],
+.form-row .form-group select {
+    min-width: 0;
+    font-size: 0.85rem;
+    padding: 10px 8px;
+}
+
+.form-row .form-group {
+    min-width: 0;
+}
+
 /* ===== RESPONSIVO ===== */
 @media (min-width: 768px) {
     .content {

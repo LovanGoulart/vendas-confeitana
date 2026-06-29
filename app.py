@@ -317,5 +317,47 @@ def api_busca():
 
     return jsonify(resultados)
 
+@app.route('/api/relatorios/mes/<ano>/<mes>')
+@login_required
+def api_relatorios_mes(ano, mes):
+    vendas = Venda.query.filter(Venda.data_iso.like(f'{ano}-{mes}-%')).all()
+
+    clientes_dict = {}
+    for v in vendas:
+        if v.cliente not in clientes_dict:
+            clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
+        clientes_dict[v.cliente]['total'] += v.total
+        clientes_dict[v.cliente]['quantidade'] += v.quantidade
+
+    clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
+    total_mes = sum(v.total for v in vendas)
+
+    return jsonify({
+        'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
+        'total_mes': total_mes,
+        'quantidade_vendas': len(vendas)
+    })
+
+@app.route('/api/relatorios/periodo/<inicio>/<fim>')
+@login_required
+def api_relatorios_periodo(inicio, fim):
+    vendas = Venda.query.filter(Venda.data_iso >= inicio, Venda.data_iso <= fim).all()
+
+    clientes_dict = {}
+    for v in vendas:
+        if v.cliente not in clientes_dict:
+            clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
+        clientes_dict[v.cliente]['total'] += v.total
+        clientes_dict[v.cliente]['quantidade'] += v.quantidade
+
+    clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
+    total_periodo = sum(v.total for v in vendas)
+
+    return jsonify({
+        'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
+        'total_periodo': total_periodo,
+        'quantidade_vendas': len(vendas)
+    })
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
