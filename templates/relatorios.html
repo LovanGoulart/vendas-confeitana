@@ -14,12 +14,9 @@
         <label>📅 Selecionar Data</label>
         <input type="date" id="dataRelatorio" value="{{ data_iso }}" onchange="carregarRelatorio()">
     </div>
-    <!--<div class="busca-container">
-        <input type="text" id="buscaCliente" placeholder="🔍 Buscar cliente..." onkeyup="buscarCliente()">
-    </div>-->
-</div>
+<!--</div>
 
-<div class="card">
+<div class="card">-->
     <h3>📈 Resumo do Dia</h3>
     <div class="resumo-grid">
         <div class="resumo-item">
@@ -35,6 +32,81 @@
     <h4>👥 Clientes (Maiores Compradores)</h4>
     <div id="listaClientesDia" class="lista-clientes">
         <p class="empty">Selecione uma data</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📅 Relatório Mensal</h3>
+    <div class="form-row">
+        <div class="form-group">
+            <label>📅 Ano</label>
+            <input type="number" id="anoRelatorioMes" value="2026" min="2020" max="2030">
+        </div>
+        <div class="form-group">
+            <label>📅 Mês</label>
+            <select id="mesRelatorio">
+                <option value="01">Janeiro</option>
+                <option value="02">Fevereiro</option>
+                <option value="03">Março</option>
+                <option value="04">Abril</option>
+                <option value="05">Maio</option>
+                <option value="06">Junho</option>
+                <option value="07">Julho</option>
+                <option value="08">Agosto</option>
+                <option value="09">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
+            </select>
+        </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="carregarRelatorioMes()">📋 Gerar Relatório Mensal</button>
+
+    <div class="resumo-grid" style="margin-top: 15px;">
+        <div class="resumo-item">
+            <span class="resumo-label">💰 Total do Mês</span>
+            <span class="resumo-valor" id="totalMes">R$ 0,00</span>
+        </div>
+        <div class="resumo-item">
+            <span class="resumo-label">🛒 Vendas</span>
+            <span class="resumo-valor" id="qtdVendasMes">0</span>
+        </div>
+    </div>
+
+    <h4>👥 Top Clientes do Mês</h4>
+    <div id="listaClientesMes" class="lista-clientes">
+        <p class="empty">Selecione ano e mês e clique em gerar</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📆 Relatório por Período</h3>
+    <div class="form-row">
+        <div class="form-group">
+            <label>📅 Data Início</label>
+            <input type="date" id="dataInicioPeriodo">
+        </div>
+        <div class="form-group">
+            <label>📅 Data Fim</label>
+            <input type="date" id="dataFimPeriodo">
+        </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="carregarRelatorioPeriodo()">📋 Gerar Relatório por Período</button>
+
+    <div class="resumo-grid" style="margin-top: 15px;">
+        <div class="resumo-item">
+            <span class="resumo-label">💰 Total do Período</span>
+            <span class="resumo-valor" id="totalPeriodo">R$ 0,00</span>
+        </div>
+        <div class="resumo-item">
+            <span class="resumo-label">🛒 Vendas</span>
+            <span class="resumo-valor" id="qtdVendasPeriodo">0</span>
+        </div>
+    </div>
+
+    <h4>👥 Top Clientes do Período</h4>
+    <div id="listaClientesPeriodo" class="lista-clientes">
+        <p class="empty">Selecione as datas e clique em gerar</p>
     </div>
 </div>
 
@@ -70,6 +142,27 @@ function formatarBr(valor) {
     return valor.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
+function renderizarClientes(containerId, clientes) {
+    const container = document.getElementById(containerId);
+    if (clientes.length === 0) {
+        container.innerHTML = '<p class="empty">Nenhuma venda encontrada</p>';
+        return;
+    }
+
+    let html = '';
+    clientes.forEach((c, i) => {
+        html += `<div class="cliente-item">
+            <div class="cliente-rank">${i + 1}º</div>
+            <div class="cliente-info">
+                <strong>${c.nome}</strong>
+                <span>${c.quantidade} item(s)</span>
+            </div>
+            <div class="cliente-valor">R$ ${formatarBr(c.total)}</div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
 function carregarRelatorio() {
     const data = document.getElementById('dataRelatorio').value;
     if (!data) {
@@ -82,25 +175,20 @@ function carregarRelatorio() {
     .then(data => {
         document.getElementById('totalDia').textContent = 'R$ ' + formatarBr(data.total_dia);
         document.getElementById('qtdVendas').textContent = data.quantidade_vendas;
+        renderizarClientes('listaClientesDia', data.clientes);
+    });
+}
 
-        const container = document.getElementById('listaClientesDia');
-        if (data.clientes.length === 0) {
-            container.innerHTML = '<p class="empty">Nenhuma venda nesta data</p>';
-            return;
-        }
+function carregarRelatorioMes() {
+    const ano = document.getElementById('anoRelatorioMes').value;
+    const mes = document.getElementById('mesRelatorio').value;
 
-        let html = '';
-        data.clientes.forEach((c, i) => {
-            html += `<div class="cliente-item">
-                <div class="cliente-rank">${i + 1}º</div>
-                <div class="cliente-info">
-                    <strong>${c.nome}</strong>
-                    <span>${c.quantidade} item(s)</span>
-                </div>
-                <div class="cliente-valor">R$ ${formatarBr(c.total)}</div>
-            </div>`;
-        });
-        container.innerHTML = html;
+    fetch('/api/relatorios/mes/' + ano + '/' + mes)
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('totalMes').textContent = 'R$ ' + formatarBr(data.total_mes);
+        document.getElementById('qtdVendasMes').textContent = data.quantidade_vendas;
+        renderizarClientes('listaClientesMes', data.clientes);
     });
 }
 
@@ -112,33 +200,30 @@ function carregarRelatorioAno() {
     .then(data => {
         document.getElementById('totalAno').textContent = 'R$ ' + formatarBr(data.total_ano);
         document.getElementById('qtdVendasAno').textContent = data.quantidade_vendas;
-
-        const container = document.getElementById('listaClientesAno');
-        if (data.clientes.length === 0) {
-            container.innerHTML = '<p class="empty">Nenhuma venda neste ano</p>';
-            return;
-        }
-
-        let html = '';
-        data.clientes.forEach((c, i) => {
-            html += `<div class="cliente-item">
-                <div class="cliente-rank">${i + 1}º</div>
-                <div class="cliente-info">
-                    <strong>${c.nome}</strong>
-                    <span>${c.quantidade} item(s)</span>
-                </div>
-                <div class="cliente-valor">R$ ${formatarBr(c.total)}</div>
-            </div>`;
-        });
-        container.innerHTML = html;
+        renderizarClientes('listaClientesAno', data.clientes);
     });
 }
 
-function buscarCliente() {
-    const termo = document.getElementById('buscaCliente').value.toLowerCase();
-    document.querySelectorAll('.cliente-item').forEach(item => {
-        const nome = item.querySelector('strong').textContent.toLowerCase();
-        item.style.display = nome.includes(termo) ? 'flex' : 'none';
+function carregarRelatorioPeriodo() {
+    const inicio = document.getElementById('dataInicioPeriodo').value;
+    const fim = document.getElementById('dataFimPeriodo').value;
+
+    if (!inicio || !fim) {
+        alert('Selecione as duas datas!');
+        return;
+    }
+
+    if (inicio > fim) {
+        alert('A data de início não pode ser maior que a data de fim!');
+        return;
+    }
+
+    fetch('/api/relatorios/periodo/' + inicio + '/' + fim)
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('totalPeriodo').textContent = 'R$ ' + formatarBr(data.total_periodo);
+        document.getElementById('qtdVendasPeriodo').textContent = data.quantidade_vendas;
+        renderizarClientes('listaClientesPeriodo', data.clientes);
     });
 }
 
