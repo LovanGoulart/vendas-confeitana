@@ -127,7 +127,7 @@ def api_vendas():
     venda = Venda(
         produto_id=data.get('produto_id'),
         produto_nome=data.get('produto_nome'),
-        cliente=data.get('cliente').strip(),
+        cliente=data.get('cliente').strip().lower(),
         valor=float(data.get('valor', 0)),
         quantidade=int(data.get('quantidade', 1)),
         total=float(data.get('valor', 0)) * int(data.get('quantidade', 1)),
@@ -141,7 +141,7 @@ def api_vendas():
     # Se for fiado, criar também na tabela fiado
     if is_fiado:
         fiado = Fiado(
-            cliente=data.get('cliente').strip(),
+            cliente=data.get('cliente').strip().lower(),
             produto=data.get('produto_nome'),
             valor=float(data.get('valor', 0)),
             quantidade=int(data.get('quantidade', 1)),
@@ -260,7 +260,7 @@ def api_fiado():
     data = request.get_json()
 
     fiado = Fiado(
-        cliente=data.get('cliente').strip(),
+        cliente=data.get('cliente').strip().lower(),
         produto=data.get('produto').strip(),
         valor=float(data.get('valor', 0)),
         quantidade=int(data.get('quantidade', 1)),
