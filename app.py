@@ -15,7 +15,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # ==================== FUSO HORÁRIO BRASÍLIA (UTC-3) ====================
-# Ajuste para horário de verão se necessário
 FUSO_BRASILIA = timedelta(hours=-3)
 
 def agora_brasilia():
@@ -131,7 +130,6 @@ def api_vendas():
     data = request.get_json()
     is_fiado = data.get('fiado', False)
 
-    # Criar venda (sempre, fiado ou não)
     venda = Venda(
         produto_id=data.get('produto_id'),
         produto_nome=data.get('produto_nome'),
@@ -146,7 +144,6 @@ def api_vendas():
     db.session.add(venda)
     db.session.flush()
 
-    # Se for fiado, criar também na tabela fiado
     if is_fiado:
         fiado = Fiado(
             cliente=data.get('cliente').strip().lower(),
@@ -176,11 +173,8 @@ def api_vendas():
 def api_editar_venda(id):
     data = request.get_json()
     venda = Venda.query.get_or_404(id)
-
-    # Calcular diferença para atualizar fiado se necessário
     valor_antigo = venda.total
 
-    # Atualizar venda
     venda.produto_id = data.get('produto_id', venda.produto_id)
     venda.produto_nome = data.get('produto_nome', venda.produto_nome)
     venda.cliente = data.get('cliente', venda.cliente).strip().lower()
@@ -190,7 +184,6 @@ def api_editar_venda(id):
     venda.data = data.get('data', venda.data)
     venda.data_iso = data.get('data_iso', venda.data_iso)
 
-    # Se era fiado, atualizar também na tabela fiados
     if venda.is_fiado:
         fiado = Fiado.query.filter_by(
             cliente=venda.cliente,
@@ -215,7 +208,6 @@ def api_editar_venda(id):
 def api_excluir_venda(id):
     venda = Venda.query.get_or_404(id)
 
-    # Se era fiado, remover também da tabela fiados
     if venda.is_fiado:
         fiado = Fiado.query.filter_by(
             cliente=venda.cliente,
@@ -293,7 +285,6 @@ def relatorios():
 @app.route('/api/relatorios/<data>')
 @login_required
 def api_relatorios(data):
-    # TODAS as vendas do dia (inclui fiado) - fiado TAMBÉM é venda
     vendas = Venda.query.filter_by(data_iso=data).all()
 
     clientes_dict = {}
@@ -315,7 +306,6 @@ def api_relatorios(data):
 @app.route('/api/relatorios/ano/<ano>')
 @login_required
 def api_relatorios_ano(ano):
-    # TODAS as vendas do ano (inclui fiado)
     vendas = Venda.query.filter(Venda.data_iso.like(f'{ano}-%')).all()
 
     clientes_dict = {}
@@ -333,6 +323,8 @@ def api_relatorios_ano(ano):
         'total_ano': total_ano,
         'quantidade_vendas': len(vendas)
     })
+
+# ==================== ROTAS FIADO (ATUALIZADAS) ====================
 
 @app.route('/fiado')
 @login_required
@@ -371,6 +363,38 @@ def api_fiado_pagar(id):
     fiado.data_pagamento = get_data_atual_br()
     db.session.commit()
     return jsonify({'success': True})
+
+# ===== NOVA ROTA: PAGAMENTO PARCIAL =====
+@app.route('/api/fiado/<int:id>/pagar-parcial', methods=['POST'])
+@login_required
+def api_fiado_pagar_parcial(id):
+    data = request.get_json()
+    valor_pago = float(data.get('valor_pago', 0))
+
+    fiado = Fiado.query.get_or_404(id)
+
+    if valor_pago >= fiado.total:
+        fiado.pago = True
+        fiado.data_pagamento = get_data_atual_br()
+    else:
+        fiado.total = fiado.total - valor_pago
+        fiado.valor = fiado.total / fiado.quantidade if fiado.quantidade > 0 else fiado.total
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+# ===== NOVA ROTA: PAGAR TUDO DO CLIENTE =====
+@app.route('/api/fiado/cliente/<cliente>/pagar', methods=['POST'])
+@login_required
+def api_fiado_pagar_cliente(cliente):
+    fiados = Fiado.query.filter_by(cliente=cliente.lower(), pago=False).all()
+
+    for fiado in fiados:
+        fiado.pago = True
+        fiado.data_pagamento = get_data_atual_br()
+
+    db.session.commit()
+    return jsonify({'success': True, 'quantidade': len(fiados)})
 
 @app.route('/api/fiado/<int:id>', methods=['DELETE'])
 @login_required

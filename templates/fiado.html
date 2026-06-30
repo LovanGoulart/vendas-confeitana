@@ -7,67 +7,71 @@
     <h2>💳 Vendas Fiado</h2>
 </div>
 
-<!--<div class="card">
-    <h3>➕ Anotar Fiado Manual</h3>
-    <div class="form-group">
-        <label>👤 Nome do Cliente</label>
-        <input type="text" id="clienteFiado" placeholder="Nome do cliente">
-    </div>
-    <div class="form-group">
-        <label>📦 Produto</label>
-        <input type="text" id="produtoFiado" placeholder="Nome do produto">
-    </div>
-    <div class="form-row">
-        <div class="form-group">
-            <label>💰 Valor Unitário (R$)</label>
-            <input type="text" id="valorFiado" placeholder="0,00" oninput="formatarInputMoeda(this); calcularTotalFiado()">
-        </div>
-        <div class="form-group">
-            <label>🔢 Quantidade</label>
-            <input type="number" id="quantidadeFiado" value="1" min="1" oninput="calcularTotalFiado()">
-        </div>
-    </div>
-    <div class="form-group">
-        <label>📅 Data</label>
-        <input type="date" id="dataFiado" value="{{ data_iso if data_iso else '' }}">
-    </div>
-    <div class="total-preview">
-        <span>Total:</span>
-        <strong id="totalFiado">R$ 0,00</strong>
-    </div>
-    <button class="btn btn-warning btn-full" onclick="salvarFiado()">💾 Anotar Fiado</button>
-</div>-->
-
+<!-- Resumo por Cliente -->
 <div class="card">
-    <div class="busca-container">
-        <input type="text" id="buscaFiado" placeholder="🔍 Buscar cliente..." onkeyup="filtrarFiado()">
-    </div>
-    <h3>📋 Contas em Aberto</h3>
-    <div id="listaFiadoAberto" class="lista-fiado">
-        {% set tem_aberto = false %}
+    <h3>📊 Resumo por Cliente</h3>
+    <div id="listaResumoClientes" class="lista-resumo-clientes">
+        {% set resumo = {} %}
         {% for fiado in fiados %}
-        {% if not fiado.pago %}
-        {% set tem_aberto = true %}
-        <div class="fiado-item" data-cliente="{{ fiado.cliente.lower() }}">
-            <div class="fiado-info">
-                <strong>{{ fiado.cliente }}</strong>
-                <span>{{ fiado.produto }} - {{ fiado.quantidade }}x</span>
-                <span class="fiado-data">{{ fiado.data }}</span>
-            </div>
-            <div class="fiado-actions">
-                <span class="fiado-valor">R$ {{ fiado.total|moeda_br }}</span>
-                <button class="btn-icon btn-success" onclick="pagarFiado({{ fiado.id }})">💰 Pagar</button>
-                <button class="btn-icon" onclick="excluirFiado({{ fiado.id }})">🗑️</button>
-            </div>
-        </div>
-        {% endif %}
+            {% if not fiado.pago %}
+                {% if fiado.cliente not in resumo %}
+                    {% set _ = resumo.update({fiado.cliente: {'total': 0, 'quantidade': 0, 'itens': []}}) %}
+                {% endif %}
+                {% set _ = resumo[fiado.cliente].update({'total': resumo[fiado.cliente].total + fiado.total, 'quantidade': resumo[fiado.cliente].quantidade + 1}) %}
+                {% set _ = resumo[fiado.cliente]['itens'].append(fiado) %}
+            {% endif %}
         {% endfor %}
-        {% if not tem_aberto %}
-        <p class="empty">Nenhuma conta em aberto</p>
+
+        {% if resumo %}
+            {% for cliente, dados in resumo.items()|sort(attribute='1.total', reverse=true) %}
+            <div class="resumo-cliente-item" onclick="toggleDetalhesCliente('{{ cliente }}')">
+                <div class="resumo-cliente-info">
+                    <strong>{{ cliente.title() }}</strong>
+                    <span>{{ dados.quantidade }} conta(s) em aberto</span>
+                </div>
+                <div class="resumo-cliente-valor">
+                    <span>R$ {{ dados.total|moeda_br }}</span>
+                    <small>▼ Clique para detalhes</small>
+                </div>
+            </div>
+
+            <!-- Detalhes do Cliente (inicialmente oculto) -->
+            <div id="detalhes-{{ cliente }}" class="detalhes-cliente" style="display: none;">
+                {% for fiado in dados.itens %}
+                <div class="detalhe-item">
+                    <div class="detalhe-info">
+                        <span><strong>{{ fiado.produto }}</strong> - {{ fiado.quantidade }}x</span>
+                        <span class="detalhe-data">{{ fiado.data }}</span>
+                    </div>
+                    <div class="detalhe-actions">
+                        <span class="detalhe-valor">R$ {{ fiado.total|moeda_br }}</span>
+                        <button class="btn-icon btn-success" onclick="event.stopPropagation(); pagarFiado({{ fiado.id }})" title="Pagar Total">💰</button>
+                        <button class="btn-icon btn-warning" onclick="event.stopPropagation(); abrirPagamentoParcial({{ fiado.id }}, {{ fiado.total }}, '{{ fiado.cliente }}', '{{ fiado.produto }}')" title="Pagar Parte">💳</button>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Pagamento Total do Cliente -->
+                <div class="detalhe-pagar-tudo">
+                    <button class="btn btn-success btn-full" onclick="event.stopPropagation(); pagarTudoCliente('{{ cliente }}')">
+                        💰 Pagar Tudo (R$ {{ dados.total|moeda_br }})
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Total Geral em Aberto -->
+            <div class="resumo-total-geral">
+                <span>Total Geral em Aberto:</span>
+                <strong>R$ {{ resumo.values()|map(attribute='total')|sum|moeda_br }}</strong>
+            </div>
+        {% else %}
+            <p class="empty">Nenhuma conta em aberto</p>
         {% endif %}
     </div>
 </div>
 
+<!-- Contas Pagas -->
 <div class="card">
     <h3>✅ Contas Pagas</h3>
     <div class="lista-fiado">
@@ -77,13 +81,13 @@
         {% set tem_pago = true %}
         <div class="fiado-item pago" data-cliente="{{ fiado.cliente.lower() }}">
             <div class="fiado-info">
-                <strong>{{ fiado.cliente }}</strong>
+                <strong>{{ fiado.cliente.title() }}</strong>
                 <span>{{ fiado.produto }} - {{ fiado.quantidade }}x</span>
                 <span class="fiado-data">Pago em: {{ fiado.data_pagamento }}</span>
             </div>
             <div class="fiado-actions">
                 <span class="fiado-valor">R$ {{ fiado.total|moeda_br }}</span>
-                <span class="badge-pago">✓ Pago</span>
+                <button class="btn-icon" onclick="excluirFiado({{ fiado.id }})" title="Excluir">🗑️</button>
             </div>
         </div>
         {% endif %}
@@ -93,10 +97,44 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Modal de Pagamento Parcial -->
+<div id="modalPagamentoParcial" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>💳 Pagamento Parcial</h3>
+            <button class="modal-close" onclick="fecharModalPagamento()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="modalClienteProduto"></p>
+            <div class="form-group">
+                <label>Valor Total da Dívida</label>
+                <input type="text" id="modalValorTotal" readonly>
+            </div>
+            <div class="form-group">
+                <label>Valor a Pagar (R$)</label>
+                <input type="text" id="modalValorPagar" placeholder="0,00" oninput="formatarInputMoeda(this); calcularRestante()">
+            </div>
+            <div class="total-preview">
+                <span>Restante:</span>
+                <strong id="modalValorRestante">R$ 0,00</strong>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="fecharModalPagamento()">Cancelar</button>
+            <button class="btn btn-success" onclick="confirmarPagamentoParcial()">Confirmar Pagamento</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+let fiadoAtualId = null;
+let fiadoAtualTotal = 0;
+let fiadoAtualCliente = '';
+let fiadoAtualProduto = '';
+
 function formatarInputMoeda(input) {
     let valor = input.value.replace(/[^\d,]/g, "").replace(/\./g, "");
     if (valor.includes(",")) {
@@ -118,44 +156,21 @@ function formatarBr(valor) {
     return valor.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
-function calcularTotalFiado() {
-    const valor = parseBr(document.getElementById('valorFiado').value);
-    const qtd = parseInt(document.getElementById('quantidadeFiado').value) || 0;
-    const total = valor * qtd;
-    document.getElementById('totalFiado').textContent = 'R$ ' + formatarBr(total);
-}
-
-function salvarFiado() {
-    const cliente = document.getElementById('clienteFiado').value.trim();
-    const produto = document.getElementById('produtoFiado').value.trim();
-    const valor = parseBr(document.getElementById('valorFiado').value);
-    const quantidade = document.getElementById('quantidadeFiado').value;
-    const data = document.getElementById('dataFiado').value;
-
-    if (!cliente || !produto || valor <= 0 || !data) {
-        alert('Preencha todos os campos!');
-        return;
+function toggleDetalhesCliente(cliente) {
+    const detalhes = document.getElementById('detalhes-' + cliente);
+    if (detalhes.style.display === 'none') {
+        // Fechar todos os outros detalhes
+        document.querySelectorAll('.detalhes-cliente').forEach(d => {
+            d.style.display = 'none';
+        });
+        detalhes.style.display = 'block';
+    } else {
+        detalhes.style.display = 'none';
     }
-
-    const partes = data.split('-');
-    const dataBr = partes[2] + '/' + partes[1] + '/' + partes[0];
-
-    fetch('/api/fiado', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({cliente, produto, valor, quantidade, data: dataBr, data_iso: data})
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ Fiado anotado!');
-            location.reload();
-        }
-    });
 }
 
 function pagarFiado(id) {
-    if (!confirm('Confirmar pagamento?')) return;
+    if (!confirm('Confirmar pagamento total?')) return;
 
     fetch('/api/fiado/' + id + '/pagar', {method: 'POST'})
     .then(r => r.json())
@@ -164,21 +179,77 @@ function pagarFiado(id) {
     });
 }
 
-function excluirFiado(id) {
-    if (!confirm('Tem certeza?')) return;
+function pagarTudoCliente(cliente) {
+    if (!confirm('Confirmar pagamento de TODAS as contas de ' + cliente + '?')) return;
 
-    fetch('/api/fiado/' + id, {method: 'DELETE'})
+    fetch('/api/fiado/cliente/' + encodeURIComponent(cliente) + '/pagar', {method: 'POST'})
     .then(r => r.json())
     .then(data => {
         if (data.success) location.reload();
     });
 }
 
-function filtrarFiado() {
-    const termo = document.getElementById('buscaFiado').value.toLowerCase();
-    document.querySelectorAll('.fiado-item[data-cliente]').forEach(item => {
-        const cliente = item.dataset.cliente;
-        item.style.display = cliente.includes(termo) ? 'flex' : 'none';
+function abrirPagamentoParcial(id, total, cliente, produto) {
+    fiadoAtualId = id;
+    fiadoAtualTotal = total;
+    fiadoAtualCliente = cliente;
+    fiadoAtualProduto = produto;
+
+    document.getElementById('modalClienteProduto').innerHTML = 
+        '<strong>' + cliente.title() + '</strong><br><span>' + produto + '</span>';
+    document.getElementById('modalValorTotal').value = 'R$ ' + formatarBr(total);
+    document.getElementById('modalValorPagar').value = '';
+    document.getElementById('modalValorRestante').textContent = 'R$ ' + formatarBr(total);
+
+    document.getElementById('modalPagamentoParcial').style.display = 'flex';
+}
+
+function fecharModalPagamento() {
+    document.getElementById('modalPagamentoParcial').style.display = 'none';
+    fiadoAtualId = null;
+    fiadoAtualTotal = 0;
+}
+
+function calcularRestante() {
+    const valorPagar = parseBr(document.getElementById('modalValorPagar').value);
+    const restante = fiadoAtualTotal - valorPagar;
+    document.getElementById('modalValorRestante').textContent = 'R$ ' + formatarBr(Math.max(0, restante));
+}
+
+function confirmarPagamentoParcial() {
+    const valorPagar = parseBr(document.getElementById('modalValorPagar').value);
+
+    if (valorPagar <= 0) {
+        alert('Informe um valor válido!');
+        return;
+    }
+
+    if (valorPagar >= fiadoAtualTotal) {
+        if (!confirm('O valor pago é igual ou maior que o total. Deseja marcar como pago total?')) return;
+        pagarFiado(fiadoAtualId);
+        return;
+    }
+
+    if (!confirm('Confirmar pagamento parcial de R$ ' + formatarBr(valorPagar) + '?')) return;
+
+    fetch('/api/fiado/' + fiadoAtualId + '/pagar-parcial', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({valor_pago: valorPagar})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+    });
+}
+
+function excluirFiado(id) {
+    if (!confirm('Tem certeza que deseja excluir esta conta paga?')) return;
+
+    fetch('/api/fiado/' + id, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
     });
 }
 </script>
