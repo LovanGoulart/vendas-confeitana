@@ -46,12 +46,11 @@
                     <div class="detalhe-actions">
                         <span class="detalhe-valor">R$ {{ fiado.total|moeda_br }}</span>
                         <button class="btn-icon btn-success" onclick="event.stopPropagation(); pagarFiado({{ fiado.id }})" title="Pagar Total">💰</button>
-                        <button class="btn-icon btn-warning" onclick="event.stopPropagation(); abrirPagamentoParcial({{ fiado.id }}, {{ fiado.total }}, '{{ fiado.cliente }}', '{{ fiado.produto }}')" title="Pagar Parte">💳</button>
+                        <button class="btn-icon btn-warning" onclick="event.stopPropagation(); abrirModalParcial({{ fiado.id }}, {{ fiado.total }}, '{{ fiado.cliente }}', '{{ fiado.produto }}')" title="Pagar Parte">💳</button>
                     </div>
                 </div>
                 {% endfor %}
 
-                <!-- Pagamento Total do Cliente -->
                 <div class="detalhe-pagar-tudo">
                     <button class="btn btn-success btn-full" onclick="event.stopPropagation(); pagarTudoCliente('{{ cliente }}')">
                         💰 Pagar Tudo (R$ {{ dados.total|moeda_br }})
@@ -60,7 +59,6 @@
             </div>
             {% endfor %}
 
-            <!-- Total Geral em Aberto -->
             <div class="resumo-total-geral">
                 <span>Total Geral em Aberto:</span>
                 <strong>R$ {{ resumo.values()|map(attribute='total')|sum|moeda_br }}</strong>
@@ -99,29 +97,29 @@
 </div>
 
 <!-- Modal de Pagamento Parcial -->
-<div id="modalPagamentoParcial" class="modal-overlay" style="display: none;">
-    <div class="modal-content">
+<div id="modalOverlay" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
         <div class="modal-header">
             <h3>💳 Pagamento Parcial</h3>
-            <button class="modal-close" onclick="fecharModalPagamento()">&times;</button>
+            <button class="modal-close" onclick="fecharModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <p id="modalClienteProduto"></p>
+            <p id="modalInfo" style="text-align:center; margin-bottom:15px;"></p>
             <div class="form-group">
-                <label>Valor Total da Dívida</label>
-                <input type="text" id="modalValorTotal" readonly>
+                <label>Valor Total da Divida</label>
+                <input type="text" id="modalTotal" readonly style="background:#f0f0f0;">
             </div>
             <div class="form-group">
                 <label>Valor a Pagar (R$)</label>
-                <input type="text" id="modalValorPagar" placeholder="0,00" oninput="formatarInputMoeda(this); calcularRestante()">
+                <input type="text" id="modalPagar" placeholder="0,00" oninput="formatarMoedaInput(this); calcularRestanteModal()">
             </div>
             <div class="total-preview">
                 <span>Restante:</span>
-                <strong id="modalValorRestante">R$ 0,00</strong>
+                <strong id="modalRestante">R$ 0,00</strong>
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="fecharModalPagamento()">Cancelar</button>
+            <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
             <button class="btn btn-success" onclick="confirmarPagamentoParcial()">Confirmar Pagamento</button>
         </div>
     </div>
@@ -130,15 +128,15 @@
 
 {% block scripts %}
 <script>
-let fiadoAtualId = null;
-let fiadoAtualTotal = 0;
-let fiadoAtualCliente = '';
-let fiadoAtualProduto = '';
+// ============== VARIAVEIS GLOBAIS ==============
+var fiadoAtualId = null;
+var fiadoAtualTotal = 0;
 
-function formatarInputMoeda(input) {
-    let valor = input.value.replace(/[^\d,]/g, "").replace(/\./g, "");
-    if (valor.includes(",")) {
-        let partes = valor.split(",");
+// ============== FUNCOES AUXILIARES ==============
+function formatarMoedaInput(input) {
+    var valor = input.value.replace(/[^\d,]/g, "").replace(/\./g, "");
+    if (valor.indexOf(",") !== -1) {
+        var partes = valor.split(",");
         if (partes[1] && partes[1].length > 2) {
             partes[1] = partes[1].substring(0, 2);
             valor = partes.join(",");
@@ -148,109 +146,145 @@ function formatarInputMoeda(input) {
 }
 
 function parseBr(valorStr) {
-    if (!valorStr) return 0;
-    return parseFloat(valorStr.replace(/\./g, "").replace(",", "."));
+    if (!valorStr || valorStr.trim() === '') return 0;
+    var limpo = valorStr.replace(/\./g, "").replace(",", ".");
+    var resultado = parseFloat(limpo);
+    return isNaN(resultado) ? 0 : resultado;
 }
 
 function formatarBr(valor) {
     return valor.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
+// ============== TOGGLE DETALHES ==============
 function toggleDetalhesCliente(cliente) {
-    const detalhes = document.getElementById('detalhes-' + cliente);
+    var detalhes = document.getElementById('detalhes-' + cliente);
     if (detalhes.style.display === 'none') {
-        // Fechar todos os outros detalhes
-        document.querySelectorAll('.detalhes-cliente').forEach(d => {
-            d.style.display = 'none';
-        });
+        var todos = document.querySelectorAll('.detalhes-cliente');
+        for (var i = 0; i < todos.length; i++) {
+            todos[i].style.display = 'none';
+        }
         detalhes.style.display = 'block';
     } else {
         detalhes.style.display = 'none';
     }
 }
 
+// ============== PAGAR TOTAL ==============
 function pagarFiado(id) {
     if (!confirm('Confirmar pagamento total?')) return;
-
     fetch('/api/fiado/' + id + '/pagar', {method: 'POST'})
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.success) location.reload();
     });
 }
 
+// ============== PAGAR TUDO DO CLIENTE ==============
 function pagarTudoCliente(cliente) {
     if (!confirm('Confirmar pagamento de TODAS as contas de ' + cliente + '?')) return;
-
     fetch('/api/fiado/cliente/' + encodeURIComponent(cliente) + '/pagar', {method: 'POST'})
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.success) location.reload();
     });
 }
 
-function abrirPagamentoParcial(id, total, cliente, produto) {
+// ============== MODAL PAGAMENTO PARCIAL ==============
+function abrirModalParcial(id, total, cliente, produto) {
+    console.log('ABRINDO MODAL - id:', id, 'total:', total);
+
     fiadoAtualId = id;
-    fiadoAtualTotal = total;
-    fiadoAtualCliente = cliente;
-    fiadoAtualProduto = produto;
+    fiadoAtualTotal = parseFloat(total);
 
-    document.getElementById('modalClienteProduto').innerHTML = 
-        '<strong>' + cliente.title() + '</strong><br><span>' + produto + '</span>';
-    document.getElementById('modalValorTotal').value = 'R$ ' + formatarBr(total);
-    document.getElementById('modalValorPagar').value = '';
-    document.getElementById('modalValorRestante').textContent = 'R$ ' + formatarBr(total);
+    document.getElementById('modalInfo').innerHTML = 
+        '<strong style="font-size:1.1rem;">' + cliente + '</strong><br><span style="color:#666;">' + produto + '</span>';
+    document.getElementById('modalTotal').value = 'R$ ' + formatarBr(fiadoAtualTotal);
+    document.getElementById('modalPagar').value = '';
+    document.getElementById('modalRestante').textContent = 'R$ ' + formatarBr(fiadoAtualTotal);
 
-    document.getElementById('modalPagamentoParcial').style.display = 'flex';
+    document.getElementById('modalOverlay').style.display = 'flex';
 }
 
-function fecharModalPagamento() {
-    document.getElementById('modalPagamentoParcial').style.display = 'none';
+function fecharModal() {
+    document.getElementById('modalOverlay').style.display = 'none';
     fiadoAtualId = null;
     fiadoAtualTotal = 0;
 }
 
-function calcularRestante() {
-    const valorPagar = parseBr(document.getElementById('modalValorPagar').value);
-    const restante = fiadoAtualTotal - valorPagar;
-    document.getElementById('modalValorRestante').textContent = 'R$ ' + formatarBr(Math.max(0, restante));
+function calcularRestanteModal() {
+    var valorPagar = parseBr(document.getElementById('modalPagar').value);
+    var restante = fiadoAtualTotal - valorPagar;
+    document.getElementById('modalRestante').textContent = 'R$ ' + formatarBr(Math.max(0, restante));
 }
 
 function confirmarPagamentoParcial() {
-    const valorPagar = parseBr(document.getElementById('modalValorPagar').value);
+    var valorInput = document.getElementById('modalPagar').value;
+    var valorPagar = parseBr(valorInput);
+
+    console.log('CONFIRMANDO - id:', fiadoAtualId, 'valorPagar:', valorPagar, 'total:', fiadoAtualTotal);
+
+    if (!fiadoAtualId) {
+        alert('Erro: ID do fiado nao encontrado.');
+        return;
+    }
 
     if (valorPagar <= 0) {
-        alert('Informe um valor válido!');
+        alert('Informe um valor valido!');
         return;
     }
 
     if (valorPagar >= fiadoAtualTotal) {
-        if (!confirm('O valor pago é igual ou maior que o total. Deseja marcar como pago total?')) return;
+        if (!confirm('O valor pago e igual ou maior que o total. Marcar como pago total?')) return;
         pagarFiado(fiadoAtualId);
         return;
     }
 
     if (!confirm('Confirmar pagamento parcial de R$ ' + formatarBr(valorPagar) + '?')) return;
 
+    var body = JSON.stringify({valor_pago: valorPagar});
+    console.log('Enviando POST para /api/fiado/' + fiadoAtualId + '/pagar-parcial');
+    console.log('Body:', body);
+
     fetch('/api/fiado/' + fiadoAtualId + '/pagar-parcial', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({valor_pago: valorPagar})
+        body: body
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) location.reload();
+    .then(function(r) {
+        console.log('Response status:', r.status);
+        if (!r.ok) {
+            return r.text().then(function(text) { throw new Error('Erro ' + r.status + ': ' + text); });
+        }
+        return r.json();
+    })
+    .then(function(data) {
+        console.log('Response data:', data);
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.message || 'Nao foi possivel processar'));
+        }
+    })
+    .catch(function(err) {
+        console.error('Erro no fetch:', err);
+        alert('Erro ao processar pagamento: ' + err.message);
     });
 }
 
+// ============== EXCLUIR ==============
 function excluirFiado(id) {
     if (!confirm('Tem certeza que deseja excluir esta conta paga?')) return;
-
     fetch('/api/fiado/' + id, {method: 'DELETE'})
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.success) location.reload();
     });
 }
+
+// Fechar modal ao clicar fora
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) fecharModal();
+});
 </script>
 {% endblock %}

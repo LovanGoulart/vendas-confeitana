@@ -7,18 +7,18 @@ import os
 app = Flask(__name__)
 app.secret_key = 'sistema_doces_2024_seguro'
 
-# Configuração do SQLite
+# Configuracao do SQLite
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'doces.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# ==================== FUSO HORÁRIO BRASÍLIA (UTC-3) ====================
+# ==================== FUSO HORARIO BRASILIA (UTC-3) ====================
 FUSO_BRASILIA = timedelta(hours=-3)
 
 def agora_brasilia():
-    """Retorna datetime atual no fuso horário de Brasília (UTC-3)"""
+    """Retorna datetime atual no fuso horario de Brasilia (UTC-3)"""
     return datetime.utcnow() + FUSO_BRASILIA
 
 # ==================== MODELOS ====================
@@ -108,7 +108,7 @@ def login():
             session['username'] = username
             return redirect(url_for('vendas'))
         else:
-            flash('Usuário ou senha incorretos!', 'error')
+            flash('Usuario ou senha incorretos!', 'error')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -364,26 +364,55 @@ def api_fiado_pagar(id):
     db.session.commit()
     return jsonify({'success': True})
 
-# ===== NOVA ROTA: PAGAMENTO PARCIAL =====
+# ===== ROTA: PAGAMENTO PARCIAL (CORRIGIDA) =====
 @app.route('/api/fiado/<int:id>/pagar-parcial', methods=['POST'])
 @login_required
 def api_fiado_pagar_parcial(id):
-    data = request.get_json()
-    valor_pago = float(data.get('valor_pago', 0))
+    try:
+        data = request.get_json()
+        print(f"[DEBUG] pagar-parcial chamado - id: {id}, body: {data}")
 
-    fiado = Fiado.query.get_or_404(id)
+        if data is None:
+            return jsonify({'success': False, 'message': 'Dados nao recebidos'}), 400
 
-    if valor_pago >= fiado.total:
-        fiado.pago = True
-        fiado.data_pagamento = get_data_atual_br()
-    else:
-        fiado.total = fiado.total - valor_pago
-        fiado.valor = fiado.total / fiado.quantidade if fiado.quantidade > 0 else fiado.total
+        valor_pago = data.get('valor_pago')
+        print(f"[DEBUG] valor_pago recebido: {valor_pago}, tipo: {type(valor_pago)}")
 
-    db.session.commit()
-    return jsonify({'success': True})
+        if valor_pago is None:
+            return jsonify({'success': False, 'message': 'valor_pago nao informado'}), 400
 
-# ===== NOVA ROTA: PAGAR TUDO DO CLIENTE =====
+        try:
+            valor_pago = float(valor_pago)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'message': f'valor_pago invalido: {valor_pago}'}), 400
+
+        if valor_pago <= 0:
+            return jsonify({'success': False, 'message': 'Valor deve ser maior que zero'}), 400
+
+        fiado = Fiado.query.get_or_404(id)
+        print(f"[DEBUG] Fiado encontrado - total atual: {fiado.total}")
+
+        if valor_pago >= fiado.total:
+            fiado.pago = True
+            fiado.data_pagamento = get_data_atual_br()
+            print(f"[DEBUG] Marcado como pago total")
+        else:
+            novo_total = fiado.total - valor_pago
+            fiado.total = round(novo_total, 2)
+            fiado.valor = round(fiado.total / fiado.quantidade, 2) if fiado.quantidade > 0 else fiado.total
+            print(f"[DEBUG] Novo total: {fiado.total}, novo valor unitario: {fiado.valor}")
+
+        db.session.commit()
+        print(f"[DEBUG] Commit realizado com sucesso")
+        return jsonify({'success': True, 'novo_total': fiado.total, 'pago': fiado.pago})
+
+    except Exception as e:
+        import traceback
+        print(f"[ERRO] Excecao em pagar-parcial: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
+
+# ===== ROTA: PAGAR TUDO DO CLIENTE =====
 @app.route('/api/fiado/cliente/<cliente>/pagar', methods=['POST'])
 @login_required
 def api_fiado_pagar_cliente(cliente):
