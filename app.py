@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from functools import wraps
 import os
 
@@ -14,6 +14,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# ==================== FUSO HORÁRIO BRASÍLIA (UTC-3) ====================
+# Ajuste para horário de verão se necessário
+FUSO_BRASILIA = timedelta(hours=-3)
+
+def agora_brasilia():
+    """Retorna datetime atual no fuso horário de Brasília (UTC-3)"""
+    return datetime.utcnow() + FUSO_BRASILIA
+
 # ==================== MODELOS ====================
 
 class Produto(db.Model):
@@ -23,7 +31,7 @@ class Produto(db.Model):
     preco = db.Column(db.Float, nullable=False)
     categoria = db.Column(db.String(50), default='')
     ativo = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=agora_brasilia)
 
 class Venda(db.Model):
     __tablename__ = 'vendas'
@@ -37,7 +45,7 @@ class Venda(db.Model):
     data = db.Column(db.String(10), nullable=False)
     data_iso = db.Column(db.String(10), nullable=False)
     is_fiado = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=agora_brasilia)
 
 class Fiado(db.Model):
     __tablename__ = 'fiados'
@@ -51,7 +59,7 @@ class Fiado(db.Model):
     data_iso = db.Column(db.String(10), nullable=False)
     pago = db.Column(db.Boolean, default=False)
     data_pagamento = db.Column(db.String(10), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=agora_brasilia)
 
 # Criar tabelas
 with app.app_context():
@@ -69,10 +77,10 @@ def login_required(f):
     return decorated_function
 
 def get_data_atual_br():
-    return datetime.now().strftime('%d/%m/%Y')
+    return agora_brasilia().strftime('%d/%m/%Y')
 
 def get_data_atual_iso():
-    return datetime.now().strftime('%Y-%m-%d')
+    return agora_brasilia().strftime('%Y-%m-%d')
 
 def formatar_br(valor):
     """Converte float para formato BR: 5.0 -> '5,00'"""
