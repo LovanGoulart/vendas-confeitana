@@ -163,6 +163,84 @@ def api_vendas():
         'fiado': is_fiado
     }})
 
+@app.route('/api/vendas/<int:id>', methods=['PUT'])
+@login_required
+def api_editar_venda(id):
+    data = request.get_json()
+    venda = Venda.query.get_or_404(id)
+
+    # Calcular diferença para atualizar fiado se necessário
+    valor_antigo = venda.total
+
+    # Atualizar venda
+    venda.produto_id = data.get('produto_id', venda.produto_id)
+    venda.produto_nome = data.get('produto_nome', venda.produto_nome)
+    venda.cliente = data.get('cliente', venda.cliente).strip().lower()
+    venda.valor = float(data.get('valor', venda.valor))
+    venda.quantidade = int(data.get('quantidade', venda.quantidade))
+    venda.total = venda.valor * venda.quantidade
+    venda.data = data.get('data', venda.data)
+    venda.data_iso = data.get('data_iso', venda.data_iso)
+
+    # Se era fiado, atualizar também na tabela fiados
+    if venda.is_fiado:
+        fiado = Fiado.query.filter_by(
+            cliente=venda.cliente,
+            produto=venda.produto_nome,
+            total=valor_antigo
+        ).order_by(Fiado.created_at.desc()).first()
+
+        if fiado:
+            fiado.cliente = venda.cliente
+            fiado.produto = venda.produto_nome
+            fiado.valor = venda.valor
+            fiado.quantidade = venda.quantidade
+            fiado.total = venda.total
+            fiado.data = venda.data
+            fiado.data_iso = venda.data_iso
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/vendas/<int:id>', methods=['DELETE'])
+@login_required
+def api_excluir_venda(id):
+    venda = Venda.query.get_or_404(id)
+
+    # Se era fiado, remover também da tabela fiados
+    if venda.is_fiado:
+        fiado = Fiado.query.filter_by(
+            cliente=venda.cliente,
+            produto=venda.produto_nome,
+            total=venda.total,
+            pago=False
+        ).order_by(Fiado.created_at.desc()).first()
+
+        if fiado:
+            db.session.delete(fiado)
+
+    db.session.delete(venda)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/vendas/dia/<data>')
+@login_required
+def api_vendas_dia(data):
+    vendas = Venda.query.filter_by(data_iso=data).order_by(Venda.created_at.desc()).all()
+    return jsonify({
+        'vendas': [{
+            'id': v.id,
+            'produto_id': v.produto_id,
+            'produto_nome': v.produto_nome,
+            'cliente': v.cliente,
+            'valor': v.valor,
+            'quantidade': v.quantidade,
+            'total': v.total,
+            'data_iso': v.data_iso,
+            'is_fiado': v.is_fiado
+        } for v in vendas]
+    })
+
 @app.route('/produtos')
 @login_required
 def produtos():

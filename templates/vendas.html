@@ -8,10 +8,6 @@
 </div>
 
 <div class="card">
-    <!--<div class="busca-container">
-        <input type="text" id="buscaProduto" placeholder="🔍 Buscar produto..." onkeyup="buscarProdutos()">
-    </div>-->
-
     <div class="form-group">
         <label>📦 Produto</label>
         <select id="produtoSelect" onchange="atualizarPreco()">
@@ -58,7 +54,7 @@
         <strong id="totalVenda">R$ 0,00</strong>
     </div>
 
-    <button class="btn btn-success btn-full" onclick="salvarVenda()">✅ Confirmar Venda</button>
+    <button class="btn btn-success btn-full" id="btnSalvar" onclick="salvarVenda()">✅ Confirmar Venda</button>
 </div>
 
 <div class="card">
@@ -75,6 +71,8 @@
 
 {% block scripts %}
 <script>
+let vendaEditando = null;
+
 function formatarBr(valor) {
     return valor.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
@@ -113,26 +111,20 @@ function calcularTotal() {
     document.getElementById('totalVenda').textContent = 'R$ ' + formatarBr(total);
 }
 
-function buscarProdutos() {
-    const termo = document.getElementById('buscaProduto').value.toLowerCase();
-    const select = document.getElementById('produtoSelect');
-    for (let i = 1; i < select.options.length; i++) {
-        const texto = select.options[i].text.toLowerCase();
-        select.options[i].style.display = texto.includes(termo) ? '' : 'none';
-    }
-}
-
 function toggleFiado() {
     const isFiado = document.getElementById('vendaFiado').checked;
-    const btn = document.querySelector('.btn-success, .btn-warning');
+    const btn = document.getElementById('btnSalvar');
+    if (vendaEditando) {
+        btn.textContent = '💾 Salvar Edição';
+        btn.className = 'btn btn-primary btn-full';
+        return;
+    }
     if (isFiado) {
         btn.textContent = '💳 Confirmar Fiado';
-        btn.classList.remove('btn-success');
-        btn.classList.add('btn-warning');
+        btn.className = 'btn btn-warning btn-full';
     } else {
         btn.textContent = '✅ Confirmar Venda';
-        btn.classList.remove('btn-warning');
-        btn.classList.add('btn-success');
+        btn.className = 'btn btn-success btn-full';
     }
 }
 
@@ -173,6 +165,25 @@ function salvarVenda() {
         fiado: isFiado
     };
 
+    // Se está editando, usar PUT
+    if (vendaEditando) {
+        fetch('/api/vendas/' + vendaEditando, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(dados)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Venda atualizada com sucesso!');
+                cancelarEdicao();
+                carregarVendasDia();
+            }
+        });
+        return;
+    }
+
+    // Nova venda
     fetch('/api/vendas', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -197,26 +208,109 @@ function salvarVenda() {
 
 function carregarVendasDia() {
     const dataIso = document.getElementById('dataFiltro').value;
-    fetch('/api/relatorios/' + dataIso)
+    fetch('/api/vendas/dia/' + dataIso)
     .then(r => r.json())
     .then(data => {
         const container = document.getElementById('listaVendasHoje');
-        if (data.clientes.length === 0) {
+        if (data.vendas.length === 0) {
             container.innerHTML = '<p class="empty">Nenhuma venda nesta data</p>';
             return;
         }
 
         let html = '';
-        data.clientes.forEach(c => {
-            html += `<div class="venda-item">
+        data.vendas.forEach(v => {
+            html += `<div class="venda-item" id="venda-${v.id}">
                 <div class="venda-info">
-                    <strong>${c.nome}</strong>
-                    <span>${c.quantidade} item(s)</span>
+                    <strong>${v.cliente}</strong>
+                    <span>${v.quantidade}x ${v.produto_nome}</span>
+                    <span style="font-size:0.75rem;color:${v.is_fiado ? '#F39C12' : '#2ECC71'}">${v.is_fiado ? '💳 Fiado' : '💰 À vista'}</span>
                 </div>
-                <div class="venda-valor">R$ ${formatarBr(c.total)}</div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="venda-valor">R$ ${formatarBr(v.total)}</div>
+                    <button class="btn-icon" onclick="editarVenda(${v.id}, '${v.cliente}', '${v.produto_nome}', ${v.valor}, ${v.quantidade}, '${v.data_iso}', ${v.is_fiado}, ${v.produto_id})" title="Editar">✏️</button>
+                    <button class="btn-icon" onclick="excluirVenda(${v.id})" title="Excluir">🗑️</button>
+                </div>
             </div>`;
         });
         container.innerHTML = html;
+    });
+}
+
+function editarVenda(id, cliente, produtoNome, valor, quantidade, dataIso, isFiado, produtoId) {
+    vendaEditando = id;
+
+    // Preencher formulário
+    document.getElementById('clienteVenda').value = cliente;
+    document.getElementById('valorVenda').value = formatarBr(valor);
+    document.getElementById('quantidadeVenda').value = quantidade;
+    document.getElementById('dataVendaInput').value = dataIso;
+    document.getElementById('vendaFiado').checked = isFiado;
+
+    // Selecionar produto no select
+    const select = document.getElementById('produtoSelect');
+    for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].dataset.nome === produtoNome) {
+            select.selectedIndex = i;
+            break;
+        }
+    }
+
+    toggleFiado();
+
+    // Mudar botão para "Salvar Edição"
+    const btn = document.getElementById('btnSalvar');
+    btn.textContent = '💾 Salvar Edição';
+    btn.className = 'btn btn-primary btn-full';
+
+    // Adicionar botão cancelar se não existe
+    if (!document.getElementById('btnCancelar')) {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.id = 'btnCancelar';
+        cancelBtn.className = 'btn btn-danger btn-full';
+        cancelBtn.style.marginTop = '10px';
+        cancelBtn.textContent = '❌ Cancelar Edição';
+        cancelBtn.onclick = cancelarEdicao;
+        btn.parentNode.insertBefore(cancelBtn, btn.nextSibling);
+    }
+
+    // Scroll para o topo
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function cancelarEdicao() {
+    vendaEditando = null;
+
+    // Limpar formulário
+    document.getElementById('clienteVenda').value = '';
+    document.getElementById('quantidadeVenda').value = '1';
+    document.getElementById('valorVenda').value = '';
+    document.getElementById('vendaFiado').checked = false;
+    document.getElementById('produtoSelect').selectedIndex = 0;
+    calcularTotal();
+    toggleFiado();
+
+    // Restaurar botão
+    const btn = document.getElementById('btnSalvar');
+    btn.textContent = '✅ Confirmar Venda';
+    btn.className = 'btn btn-success btn-full';
+
+    // Remover botão cancelar
+    const cancelBtn = document.getElementById('btnCancelar');
+    if (cancelBtn) cancelBtn.remove();
+}
+
+function excluirVenda(id) {
+    if (!confirm('Tem certeza que deseja excluir esta venda?')) return;
+
+    fetch('/api/vendas/' + id, {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('🗑️ Venda excluída com sucesso!');
+            carregarVendasDia();
+        }
     });
 }
 
