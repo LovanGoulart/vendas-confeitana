@@ -21,7 +21,7 @@
             <span class="menu-icon">💳</span>
             <span class="menu-label">Fiado</span>
         </a>
-        <a href="{{ url_for('vendas') }}" class="menu-item menu-destaque" title="Nova Venda">
+        <a href="{{ url_for('vendas') }}" class="menu-item" title="Nova Venda">
             <span class="menu-icon">➕</span>
         </a>
     </nav>
@@ -39,7 +39,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <button class="scroll-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Voltar ao topo">⬆️</button>
+    <button class="scroll-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Voltar ao topo"></button>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block scripts %}{% endblock %}

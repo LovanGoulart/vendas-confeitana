@@ -646,7 +646,7 @@ body {
 /* ===== SCROLL TOP ===== */
 .scroll-top {
     position: fixed;
-    bottom: 80px;
+    bottom: 90px;
     right: 20px;
     width: 48px;
     height: 48px;
@@ -656,7 +656,7 @@ body {
     color: var(--white);
     font-size: 1.4rem;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s, visibility 0.3s, transform 0.2s;
@@ -664,6 +664,13 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.scroll-top::before {
+    content: '↑';
+    font-size: 1.6rem;
+    font-weight: bold;
+    line-height: 1;
 }
 
 .scroll-top.visible {
