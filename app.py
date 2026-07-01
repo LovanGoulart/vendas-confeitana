@@ -3,22 +3,60 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta
 from functools import wraps
 import os
+import sqlite3
 
 app = Flask(__name__)
 app.secret_key = 'sistema_doces_2024_seguro'
 
 # Configuracao do SQLite
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'doces.db')
+DB_PATH = os.path.join(BASE_DIR, 'doces.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# ==================== MIGRACAO AUTOMATICA ====================
+def executar_migracao():
+    """Adiciona coluna fiado_id se nao existir e vincula vendas fiadas existentes"""
+    if not os.path.exists(DB_PATH):
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA table_info(vendas)")
+    colunas = [col[1] for col in cursor.fetchall()]
+
+    if 'fiado_id' in colunas:
+        conn.close()
+        return
+
+    print("[MIGRACAO] Adicionando coluna fiado_id...")
+    cursor.execute("ALTER TABLE vendas ADD COLUMN fiado_id INTEGER")
+
+    cursor.execute("SELECT id, cliente, produto_nome, total, data_iso FROM vendas WHERE is_fiado = 1")
+    vendas_fiadas = cursor.fetchall()
+
+    for venda_id, cliente, produto, total, data_iso in vendas_fiadas:
+        cursor.execute("""
+            SELECT id FROM fiados 
+            WHERE cliente = ? AND produto = ? AND total = ? AND data_iso = ? AND pago = 0
+            ORDER BY created_at DESC LIMIT 1
+        """, (cliente, produto, total, data_iso))
+
+        resultado = cursor.fetchone()
+        if resultado:
+            cursor.execute("UPDATE vendas SET fiado_id = ? WHERE id = ?", (resultado[0], venda_id))
+
+    conn.commit()
+    conn.close()
+    print("[MIGRACAO] Concluida.")
 
 # ==================== FUSO HORARIO BRASILIA (UTC-3) ====================
 FUSO_BRASILIA = timedelta(hours=-3)
 
 def agora_brasilia():
-    """Retorna datetime atual no fuso horario de Brasilia (UTC-3)"""
     return datetime.utcnow() + FUSO_BRASILIA
 
 # ==================== MODELOS ====================
@@ -44,6 +82,7 @@ class Venda(db.Model):
     data = db.Column(db.String(10), nullable=False)
     data_iso = db.Column(db.String(10), nullable=False)
     is_fiado = db.Column(db.Boolean, default=False)
+    fiado_id = db.Column(db.Integer, db.ForeignKey('fiados.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=agora_brasilia)
 
 class Fiado(db.Model):
@@ -60,9 +99,10 @@ class Fiado(db.Model):
     data_pagamento = db.Column(db.String(10), nullable=True)
     created_at = db.Column(db.DateTime, default=agora_brasilia)
 
-# Criar tabelas
+# Criar tabelas e executar migracao
 with app.app_context():
     db.create_all()
+    executar_migracao()
 
 ADMIN_USER = 'admin'
 ADMIN_PASS = 'admin123'
@@ -82,10 +122,8 @@ def get_data_atual_iso():
     return agora_brasilia().strftime('%Y-%m-%d')
 
 def formatar_br(valor):
-    """Converte float para formato BR: 5.0 -> '5,00'"""
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# Filtro Jinja para formatar moeda
 @app.template_filter('moeda_br')
 def moeda_br_filter(valor):
     return formatar_br(valor)
@@ -143,7 +181,8 @@ def api_vendas():
             total=float(p.get('total', 0)),
             data=data.get('data'),
             data_iso=data.get('data_iso'),
-            is_fiado=is_fiado
+            is_fiado=is_fiado,
+            fiado_id=None
         )
         db.session.add(venda)
         db.session.flush()
@@ -160,6 +199,8 @@ def api_vendas():
                 pago=False
             )
             db.session.add(fiado)
+            db.session.flush()
+            venda.fiado_id = fiado.id
 
         vendas_criadas.append({
             'id': venda.id,
@@ -171,7 +212,6 @@ def api_vendas():
         })
 
     db.session.commit()
-
     return jsonify({'success': True, 'vendas': vendas_criadas})
 
 @app.route('/api/vendas/<int:id>', methods=['PUT'])
@@ -180,55 +220,47 @@ def api_editar_venda(id):
     data = request.get_json()
     venda = Venda.query.get_or_404(id)
 
-    # Verificar se mudou o status de fiado
     novo_fiado = data.get('fiado', venda.is_fiado)
     fiado_mudou = (novo_fiado != venda.is_fiado)
 
-    # Se mudou de não-fiado para fiado -> criar fiado
+    # Nao-fiado -> fiado: criar fiado
     if fiado_mudou and novo_fiado and not venda.is_fiado:
         fiado = Fiado(
-            cliente=venda.cliente,
-            produto=venda.produto_nome,
-            valor=venda.valor,
-            quantidade=venda.quantidade,
-            total=venda.total,
-            data=venda.data,
-            data_iso=venda.data_iso,
+            cliente=data.get('cliente', venda.cliente).strip().lower(),
+            produto=data.get('produto_nome', venda.produto_nome),
+            valor=float(data.get('valor', venda.valor)),
+            quantidade=int(data.get('quantidade', venda.quantidade)),
+            total=float(data.get('total', venda.total)),
+            data=data.get('data', venda.data),
+            data_iso=data.get('data_iso', venda.data_iso),
             pago=False
         )
         db.session.add(fiado)
+        db.session.flush()
+        venda.fiado_id = fiado.id
 
-    # Se mudou de fiado para não-fiado -> remover fiado correspondente
+    # Fiado -> nao-fiado: remover fiado vinculado
     if fiado_mudou and not novo_fiado and venda.is_fiado:
-        fiado = Fiado.query.filter_by(
-            cliente=venda.cliente,
-            produto=venda.produto_nome,
-            total=venda.total,
-            pago=False
-        ).order_by(Fiado.created_at.desc()).first()
+        if venda.fiado_id:
+            fiado = Fiado.query.get(venda.fiado_id)
+            if fiado:
+                db.session.delete(fiado)
+        venda.fiado_id = None
 
-        if fiado:
-            db.session.delete(fiado)
-
-    # Se continua fiado e houve mudança de valores -> atualizar fiado
+    # Continua fiado, atualizar fiado vinculado
     if venda.is_fiado and novo_fiado and not fiado_mudou:
-        fiado = Fiado.query.filter_by(
-            cliente=venda.cliente,
-            produto=venda.produto_nome,
-            total=venda.total,
-            pago=False
-        ).order_by(Fiado.created_at.desc()).first()
+        if venda.fiado_id:
+            fiado = Fiado.query.get(venda.fiado_id)
+            if fiado:
+                fiado.cliente = data.get('cliente', venda.cliente).strip().lower()
+                fiado.produto = data.get('produto_nome', venda.produto_nome)
+                fiado.valor = float(data.get('valor', venda.valor))
+                fiado.quantidade = int(data.get('quantidade', venda.quantidade))
+                fiado.total = float(data.get('total', venda.total))
+                fiado.data = data.get('data', venda.data)
+                fiado.data_iso = data.get('data_iso', venda.data_iso)
 
-        if fiado:
-            fiado.cliente = data.get('cliente', venda.cliente).strip().lower()
-            fiado.produto = data.get('produto_nome', venda.produto_nome)
-            fiado.valor = float(data.get('valor', venda.valor))
-            fiado.quantidade = int(data.get('quantidade', venda.quantidade))
-            fiado.total = float(data.get('total', venda.total))
-            fiado.data = data.get('data', venda.data)
-            fiado.data_iso = data.get('data_iso', venda.data_iso)
-
-    # Atualizar venda
+    venda.produto_nome = data.get('produto_nome', venda.produto_nome)
     venda.cliente = data.get('cliente', venda.cliente).strip().lower()
     venda.valor = float(data.get('valor', venda.valor))
     venda.quantidade = int(data.get('quantidade', venda.quantidade))
@@ -245,14 +277,8 @@ def api_editar_venda(id):
 def api_excluir_venda(id):
     venda = Venda.query.get_or_404(id)
 
-    if venda.is_fiado:
-        fiado = Fiado.query.filter_by(
-            cliente=venda.cliente,
-            produto=venda.produto_nome,
-            total=venda.total,
-            pago=False
-        ).order_by(Fiado.created_at.desc()).first()
-
+    if venda.fiado_id:
+        fiado = Fiado.query.get(venda.fiado_id)
         if fiado:
             db.session.delete(fiado)
 
@@ -288,7 +314,6 @@ def produtos():
 @login_required
 def api_produtos():
     data = request.get_json()
-
     produto = Produto(
         nome=data.get('nome').strip(),
         preco=float(data.get('preco', 0)),
@@ -296,7 +321,6 @@ def api_produtos():
     )
     db.session.add(produto)
     db.session.commit()
-
     return jsonify({'success': True, 'produto': {
         'id': produto.id,
         'nome': produto.nome,
@@ -331,17 +355,14 @@ def relatorios():
 @login_required
 def api_relatorios(data):
     vendas = Venda.query.filter_by(data_iso=data).all()
-
     clientes_dict = {}
     for v in vendas:
         if v.cliente not in clientes_dict:
             clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
         clientes_dict[v.cliente]['total'] += v.total
         clientes_dict[v.cliente]['quantidade'] += v.quantidade
-
     clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
     total_dia = sum(v.total for v in vendas)
-
     return jsonify({
         'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
         'total_dia': total_dia,
@@ -352,24 +373,21 @@ def api_relatorios(data):
 @login_required
 def api_relatorios_ano(ano):
     vendas = Venda.query.filter(Venda.data_iso.like(f'{ano}-%')).all()
-
     clientes_dict = {}
     for v in vendas:
         if v.cliente not in clientes_dict:
             clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
         clientes_dict[v.cliente]['total'] += v.total
         clientes_dict[v.cliente]['quantidade'] += v.quantidade
-
     clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
     total_ano = sum(v.total for v in vendas)
-
     return jsonify({
         'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
         'total_ano': total_ano,
         'quantidade_vendas': len(vendas)
     })
 
-# ==================== ROTAS FIADO (ATUALIZADAS) ====================
+# ==================== ROTAS FIADO ====================
 
 @app.route('/fiado')
 @login_required
@@ -381,7 +399,6 @@ def fiado():
 @login_required
 def api_fiado():
     data = request.get_json()
-
     fiado = Fiado(
         cliente=data.get('cliente').strip().lower(),
         produto=data.get('produto').strip(),
@@ -393,7 +410,6 @@ def api_fiado():
     )
     db.session.add(fiado)
     db.session.commit()
-
     return jsonify({'success': True, 'fiado': {
         'id': fiado.id,
         'cliente': fiado.cliente,
@@ -409,64 +425,44 @@ def api_fiado_pagar(id):
     db.session.commit()
     return jsonify({'success': True})
 
-# ===== ROTA: PAGAMENTO PARCIAL (CORRIGIDA) =====
 @app.route('/api/fiado/<int:id>/pagar-parcial', methods=['POST'])
 @login_required
 def api_fiado_pagar_parcial(id):
     try:
         data = request.get_json()
-        print(f"[DEBUG] pagar-parcial chamado - id: {id}, body: {data}")
-
         if data is None:
             return jsonify({'success': False, 'message': 'Dados nao recebidos'}), 400
-
         valor_pago = data.get('valor_pago')
-        print(f"[DEBUG] valor_pago recebido: {valor_pago}, tipo: {type(valor_pago)}")
-
         if valor_pago is None:
             return jsonify({'success': False, 'message': 'valor_pago nao informado'}), 400
-
         try:
             valor_pago = float(valor_pago)
         except (ValueError, TypeError):
             return jsonify({'success': False, 'message': f'valor_pago invalido: {valor_pago}'}), 400
-
         if valor_pago <= 0:
             return jsonify({'success': False, 'message': 'Valor deve ser maior que zero'}), 400
-
         fiado = Fiado.query.get_or_404(id)
-        print(f"[DEBUG] Fiado encontrado - total atual: {fiado.total}")
-
         if valor_pago >= fiado.total:
             fiado.pago = True
             fiado.data_pagamento = get_data_atual_br()
-            print(f"[DEBUG] Marcado como pago total")
         else:
             novo_total = fiado.total - valor_pago
             fiado.total = round(novo_total, 2)
             fiado.valor = round(fiado.total / fiado.quantidade, 2) if fiado.quantidade > 0 else fiado.total
-            print(f"[DEBUG] Novo total: {fiado.total}, novo valor unitario: {fiado.valor}")
-
         db.session.commit()
-        print(f"[DEBUG] Commit realizado com sucesso")
         return jsonify({'success': True, 'novo_total': fiado.total, 'pago': fiado.pago})
-
     except Exception as e:
         import traceback
-        print(f"[ERRO] Excecao em pagar-parcial: {str(e)}")
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
 
-# ===== ROTA: PAGAR TUDO DO CLIENTE =====
 @app.route('/api/fiado/cliente/<cliente>/pagar', methods=['POST'])
 @login_required
 def api_fiado_pagar_cliente(cliente):
     fiados = Fiado.query.filter_by(cliente=cliente.lower(), pago=False).all()
-
     for fiado in fiados:
         fiado.pago = True
         fiado.data_pagamento = get_data_atual_br()
-
     db.session.commit()
     return jsonify({'success': True, 'quantidade': len(fiados)})
 
@@ -483,39 +479,32 @@ def delete_fiado(id):
 def api_busca():
     termo = request.args.get('q', '').lower()
     tipo = request.args.get('tipo', 'todos')
-
     resultados = {'produtos': [], 'clientes': []}
-
     if tipo in ['todos', 'produtos']:
         produtos = Produto.query.filter(
             Produto.nome.ilike(f'%{termo}%'),
             Produto.ativo == True
         ).all()
         resultados['produtos'] = [{'id': p.id, 'nome': p.nome, 'preco': p.preco} for p in produtos]
-
     if tipo in ['todos', 'clientes']:
         clientes = db.session.query(Venda.cliente).filter(
             Venda.cliente.ilike(f'%{termo}%')
         ).distinct().all()
         resultados['clientes'] = [c[0] for c in clientes]
-
     return jsonify(resultados)
 
 @app.route('/api/relatorios/mes/<ano>/<mes>')
 @login_required
 def api_relatorios_mes(ano, mes):
     vendas = Venda.query.filter(Venda.data_iso.like(f'{ano}-{mes}-%')).all()
-
     clientes_dict = {}
     for v in vendas:
         if v.cliente not in clientes_dict:
             clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
         clientes_dict[v.cliente]['total'] += v.total
         clientes_dict[v.cliente]['quantidade'] += v.quantidade
-
     clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
     total_mes = sum(v.total for v in vendas)
-
     return jsonify({
         'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
         'total_mes': total_mes,
@@ -526,17 +515,14 @@ def api_relatorios_mes(ano, mes):
 @login_required
 def api_relatorios_periodo(inicio, fim):
     vendas = Venda.query.filter(Venda.data_iso >= inicio, Venda.data_iso <= fim).all()
-
     clientes_dict = {}
     for v in vendas:
         if v.cliente not in clientes_dict:
             clientes_dict[v.cliente] = {'total': 0, 'quantidade': 0}
         clientes_dict[v.cliente]['total'] += v.total
         clientes_dict[v.cliente]['quantidade'] += v.quantidade
-
     clientes_ordenados = sorted(clientes_dict.items(), key=lambda x: x[1]['total'], reverse=True)
     total_periodo = sum(v.total for v in vendas)
-
     return jsonify({
         'clientes': [{'nome': c[0], **c[1]} for c in clientes_ordenados],
         'total_periodo': total_periodo,

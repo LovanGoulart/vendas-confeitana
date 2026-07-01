@@ -85,7 +85,7 @@ function parseBr(valorStr) {
 }
 
 function atualizarPrecoAdd() {
-    // Apenas para referência visual, o preço é mostrado no select
+    // Apenas para referencia visual, o preco eh mostrado no select
 }
 
 function adicionarProduto() {
@@ -102,7 +102,7 @@ function adicionarProduto() {
     const nome = option.dataset.nome;
     const id = option.value;
 
-    // Verificar se já existe
+    // Verificar se ja existe
     const existente = produtosVenda.find(p => p.produto_id == id);
     if (existente) {
         existente.quantidade += qtd;
@@ -160,7 +160,7 @@ function toggleFiado() {
     const isFiado = document.getElementById('vendaFiado').checked;
     const btn = document.getElementById('btnSalvar');
     if (vendaEditando) {
-        btn.textContent = '💾 Salvar Edição';
+        btn.textContent = '💾 Salvar Edicao';
         btn.className = 'btn btn-primary btn-full';
         return;
     }
@@ -203,7 +203,7 @@ function salvarVenda() {
         produtos: produtosVenda
     };
 
-    // Se está editando, usar PUT
+    // Se esta editando, usar PUT
     if (vendaEditando) {
         fetch('/api/vendas/' + vendaEditando, {
             method: 'PUT',
@@ -259,7 +259,7 @@ function carregarVendasDia() {
                 <div class="venda-info">
                     <strong>${v.cliente}</strong>
                     <span>${v.quantidade}x ${v.produto_nome}</span>
-                    <span style="font-size:0.75rem;color:${v.is_fiado ? '#F39C12' : '#2ECC71'}">${v.is_fiado ? '💳 Fiado' : '💰 À vista'}</span>
+                    <span style="font-size:0.75rem;color:${v.is_fiado ? '#F39C12' : '#2ECC71'}">${v.is_fiado ? '💳 Fiado' : '💰 A vista'}</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;">
                     <div class="venda-valor">R$ ${formatarBr(v.total)}</div>
@@ -279,7 +279,7 @@ function editarVenda(id, cliente, produtoNome, valor, quantidade, dataIso, isFia
     document.getElementById('dataVendaInput').value = dataIso;
     document.getElementById('vendaFiado').checked = isFiado;
 
-    // Para edição, adicionamos o produto na lista
+    // Para edicao, adicionamos o produto na lista
     produtosVenda = [{
         produto_id: String(produtoId),
         produto_nome: produtoNome,
@@ -292,7 +292,7 @@ function editarVenda(id, cliente, produtoNome, valor, quantidade, dataIso, isFia
     toggleFiado();
 
     const btn = document.getElementById('btnSalvar');
-    btn.textContent = '💾 Salvar Edição';
+    btn.textContent = '💾 Salvar Edicao';
     btn.className = 'btn btn-primary btn-full';
 
     if (!document.getElementById('btnCancelar')) {
@@ -300,7 +300,7 @@ function editarVenda(id, cliente, produtoNome, valor, quantidade, dataIso, isFia
         cancelBtn.id = 'btnCancelar';
         cancelBtn.className = 'btn btn-danger btn-full';
         cancelBtn.style.marginTop = '10px';
-        cancelBtn.textContent = '❌ Cancelar Edição';
+        cancelBtn.textContent = '❌ Cancelar Edicao';
         cancelBtn.onclick = cancelarEdicao;
         btn.parentNode.insertBefore(cancelBtn, btn.nextSibling);
     }
@@ -334,7 +334,7 @@ function excluirVenda(id) {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert('🗑️ Venda excluída com sucesso!');
+            alert('🗑️ Venda excluida com sucesso!');
             carregarVendasDia();
         }
     });
