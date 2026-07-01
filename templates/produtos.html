@@ -36,6 +36,9 @@
                 <strong>{{ produto.nome }}</strong>
                 <span class="categoria">{{ produto.categoria }}</span>
             </div>
+            <div class="produto-vendas">
+                <span class="qtd-vendida" title="Quantidade total vendida"> {{ produto.qtd_vendida }} vendidos</span>
+            </div>
             <div class="produto-actions">
                 <span class="preco">R$ {{ produto.preco|moeda_br }}</span>
                 <button class="btn-icon btn-excluir" onclick="excluirProduto({{ produto.id }})" title="Excluir">🗑️</button>

@@ -308,6 +308,19 @@ def api_vendas_dia(data):
 @login_required
 def produtos():
     produtos = Produto.query.filter_by(ativo=True).order_by(Produto.nome).all()
+
+    # Buscar quantidade total vendida por produto
+    from sqlalchemy import func
+    vendas_por_produto = db.session.query(
+        Venda.produto_id,
+        func.sum(Venda.quantidade).label('qtd_total')
+    ).group_by(Venda.produto_id).all()
+
+    qtd_dict = {v[0]: int(v[1] or 0) for v in vendas_por_produto}
+
+    for p in produtos:
+        p.qtd_vendida = qtd_dict.get(p.id, 0)
+
     return render_template('produtos.html', produtos=produtos)
 
 @app.route('/api/produtos', methods=['POST'])

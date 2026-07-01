@@ -363,6 +363,26 @@ body {
     border-radius: 8px;
 }
 
+.produto-vendas {
+    margin-left: auto;
+    margin-right: 10px;
+}
+
+.qtd-vendida {
+    font-size: 0.85rem;
+    color: #666;
+    background: #f0f0f0;
+    padding: 4px 10px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.produto-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .produto-info {
     display: flex;
     flex-direction: column;
