@@ -362,7 +362,33 @@ def reativar_produto(id):
 def relatorios():
     data_atual = get_data_atual_br()
     data_iso = get_data_atual_iso()
-    return render_template('relatorios.html', data_atual=data_atual, data_iso=data_iso)
+    mes_atual = agora_brasilia().strftime('%m')
+    ano_atual = agora_brasilia().strftime('%Y')
+
+    # Buscar anos distintos que tem vendas
+    anos_rows = db.session.query(db.func.distinct(db.func.substr(Venda.data_iso, 1, 4))).all()
+    anos_com_vendas = sorted([r[0] for r in anos_rows if r[0]], reverse=True)
+
+    # Se nao tiver nenhum ano, adicionar o ano atual
+    if not anos_com_vendas:
+        anos_com_vendas = [ano_atual]
+
+    # Buscar meses com vendas no ano selecionado (ano atual por padrao)
+    meses_rows = db.session.query(
+        db.func.distinct(db.func.substr(Venda.data_iso, 6, 2))
+    ).filter(Venda.data_iso.like(f'{ano_atual}-%')).all()
+
+    meses_com_vendas = []
+    for r in sorted([r[0] for r in meses_rows if r[0]]):
+        meses_com_vendas.append((r, NOMES_MESES.get(r, r)))
+
+    # Se nao tiver meses, adicionar o mes atual
+    if not meses_com_vendas:
+        meses_com_vendas = [(mes_atual, NOMES_MESES.get(mes_atual, mes_atual))]
+
+    return render_template('relatorios.html', data_atual=data_atual, data_iso=data_iso, 
+                           mes_atual=mes_atual, anos_com_vendas=anos_com_vendas, ano_atual=ano_atual,
+                           meses_com_vendas=meses_com_vendas)
 
 @app.route('/api/relatorios/<data>')
 @login_required
@@ -505,6 +531,25 @@ def api_busca():
         ).distinct().all()
         resultados['clientes'] = [c[0] for c in clientes]
     return jsonify(resultados)
+
+NOMES_MESES = {
+    '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+    '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+    '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+}
+
+@app.route('/api/relatorios/meses-disponiveis/<ano>')
+@login_required
+def api_meses_disponiveis(ano):
+    meses_rows = db.session.query(
+        db.func.distinct(db.func.substr(Venda.data_iso, 6, 2))
+    ).filter(Venda.data_iso.like(f'{ano}-%')).all()
+
+    meses = []
+    for r in sorted([r[0] for r in meses_rows if r[0]]):
+        meses.append({'numero': r, 'nome': NOMES_MESES.get(r, r)})
+
+    return jsonify({'meses': meses})
 
 @app.route('/api/relatorios/mes/<ano>/<mes>')
 @login_required
