@@ -8,21 +8,22 @@
 </head>
 <body>
     {% if session.get('logged_in') %}
-    <nav class="menu-topo">
-        <div class="menu-container">
-            <div class="logo">🍬 Doces</div>
-            <div class="menu-right">
-                <a href="{{ url_for('vendas') }}" class="btn-nova-venda" title="Nova Venda">➕</a>
-                <button class="menu-toggle" onclick="toggleMenu()">☰</button>
-            </div>
-            <ul class="menu-list" id="menuList">
-                <li><a href="{{ url_for('vendas') }}" class="{% if request.endpoint == 'vendas' %}active{% endif %}">🛒 Vendas</a></li>
-                <li><a href="{{ url_for('produtos') }}" class="{% if request.endpoint == 'produtos' %}active{% endif %}">📦 Produtos</a></li>
-                <li><a href="{{ url_for('fiado') }}" class="{% if request.endpoint == 'fiado' %}active{% endif %}">💳 Fiado</a></li>
-                <li><a href="{{ url_for('relatorios') }}" class="{% if request.endpoint == 'relatorios' %}active{% endif %}">📊 Relatórios</a></li>
-                <li><a href="{{ url_for('logout') }}">🚪 Sair</a></li>
-            </ul>
-        </div>
+    <nav class="menu-inferior">
+        <a href="{{ url_for('produtos') }}" class="menu-item {% if request.endpoint == 'produtos' %}active{% endif %}">
+            <span class="menu-icon">📦</span>
+            <span class="menu-label">Produtos</span>
+        </a>
+        <a href="{{ url_for('relatorios') }}" class="menu-item {% if request.endpoint == 'relatorios' %}active{% endif %}">
+            <span class="menu-icon">📊</span>
+            <span class="menu-label">Relatórios</span>
+        </a>
+        <a href="{{ url_for('fiado') }}" class="menu-item {% if request.endpoint == 'fiado' %}active{% endif %}">
+            <span class="menu-icon">💳</span>
+            <span class="menu-label">Fiado</span>
+        </a>
+        <a href="{{ url_for('vendas') }}" class="menu-item" title="Nova Venda">
+            <span class="menu-icon">➕</span>
+        </a>
     </nav>
     {% endif %}
 
@@ -38,7 +39,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <button class="scroll-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Voltar ao topo">⬆️</button>
+    <button class="scroll-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Voltar ao topo"></button>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block scripts %}{% endblock %}

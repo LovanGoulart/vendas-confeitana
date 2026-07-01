@@ -40,23 +40,18 @@
     <div class="form-row">
         <div class="form-group">
             <label>📅 Ano</label>
-            <input type="number" id="anoRelatorioMes" value="2026" min="2020" max="2030">
+            <select id="anoRelatorioMes">
+                {% for ano in anos_com_vendas %}
+                <option value="{{ ano }}" {% if ano == ano_atual %}selected{% endif %}>{{ ano }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-group">
             <label>📅 Mês</label>
             <select id="mesRelatorio">
-                <option value="01">Janeiro</option>
-                <option value="02">Fevereiro</option>
-                <option value="03">Março</option>
-                <option value="04">Abril</option>
-                <option value="05">Maio</option>
-                <option value="06">Junho</option>
-                <option value="07">Julho</option>
-                <option value="08">Agosto</option>
-                <option value="09">Setembro</option>
-                <option value="10">Outubro</option>
-                <option value="11">Novembro</option>
-                <option value="12">Dezembro</option>
+                {% for mes_num, mes_nome in meses_com_vendas %}
+                <option value="{{ mes_num }}" {% if mes_num == mes_atual %}selected{% endif %}>{{ mes_nome }}</option>
+                {% endfor %}
             </select>
         </div>
     </div>
@@ -114,7 +109,11 @@
     <h3>📊 Resumo do Ano</h3>
     <div class="form-group">
         <label>📅 Ano</label>
-        <input type="number" id="anoRelatorio" value="2026" min="2020" max="2030">
+        <select id="anoRelatorio">
+            {% for ano in anos_com_vendas %}
+            <option value="{{ ano }}" {% if ano == ano_atual %}selected{% endif %}>{{ ano }}</option>
+            {% endfor %}
+        </select>
     </div>
     <button class="btn btn-primary btn-full" onclick="carregarRelatorioAno()">📋 Gerar Relatório Anual</button>
 
@@ -224,6 +223,27 @@ function carregarRelatorioPeriodo() {
         document.getElementById('totalPeriodo').textContent = 'R$ ' + formatarBr(data.total_periodo);
         document.getElementById('qtdVendasPeriodo').textContent = data.quantidade_vendas;
         renderizarClientes('listaClientesPeriodo', data.clientes);
+    });
+}
+
+
+// Atualizar meses disponíveis quando o ano mudar
+document.getElementById('anoRelatorioMes').addEventListener('change', function() {
+    carregarMesesDisponiveis(this.value);
+});
+
+function carregarMesesDisponiveis(ano) {
+    fetch('/api/relatorios/meses-disponiveis/' + ano)
+    .then(r => r.json())
+    .then(data => {
+        const select = document.getElementById('mesRelatorio');
+        select.innerHTML = '';
+        data.meses.forEach(function(m) {
+            var opt = document.createElement('option');
+            opt.value = m.numero;
+            opt.textContent = m.nome;
+            select.appendChild(opt);
+        });
     });
 }
 
