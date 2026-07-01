@@ -98,27 +98,27 @@
 
 <!-- Modal de Pagamento Parcial -->
 <div id="modalOverlay" class="modal-overlay" style="display: none;">
-    <div class="modal-box">
-        <div class="modal-header">
-            <h3>💳 Pagamento Parcial</h3>
-            <button class="modal-close" onclick="fecharModal()">&times;</button>
+    <div class="modal-box" style="background:#fff;color:#333;">
+        <div class="modal-header" style="background:#f8f9fa;border-bottom:1px solid #ddd;">
+            <h3 style="color:#333;">💳 Pagamento Parcial</h3>
+            <button class="modal-close" onclick="fecharModal()" style="color:#333;">&times;</button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="color:#333;">
             <p id="modalInfo" style="text-align:center; margin-bottom:15px;"></p>
             <div class="form-group">
-                <label>Valor Total da Divida</label>
-                <input type="text" id="modalTotal" readonly style="background:#f0f0f0;">
+                <label style="color:#333;">Valor Total da Divida</label>
+                <input type="text" id="modalTotal" readonly style="background:#f0f0f0;color:#333;border:1px solid #ccc;">
             </div>
             <div class="form-group">
-                <label>Valor a Pagar (R$)</label>
-                <input type="text" id="modalPagar" placeholder="0,00" oninput="formatarMoedaInput(this); calcularRestanteModal()">
+                <label style="color:#333;">Valor a Pagar (R$)</label>
+                <input type="text" id="modalPagar" placeholder="0,00" oninput="formatarMoedaInput(this); calcularRestanteModal()" style="color:#333;border:1px solid #ccc;">
             </div>
             <div class="total-preview">
                 <span>Restante:</span>
                 <strong id="modalRestante">R$ 0,00</strong>
             </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer" style="background:#f8f9fa;border-top:1px solid #ddd;">
             <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
             <button class="btn btn-success" onclick="confirmarPagamentoParcial()">Confirmar Pagamento</button>
         </div>
@@ -198,7 +198,7 @@ function abrirModalParcial(id, total, cliente, produto) {
     fiadoAtualTotal = parseFloat(total);
 
     document.getElementById('modalInfo').innerHTML = 
-        '<strong style="font-size:1.1rem;">' + cliente + '</strong><br><span style="color:#666;">' + produto + '</span>';
+        '<strong style="font-size:1.1rem;color:#333;">' + cliente + '</strong><br><span style="color:#555;">' + produto + '</span>';
     document.getElementById('modalTotal').value = 'R$ ' + formatarBr(fiadoAtualTotal);
     document.getElementById('modalPagar').value = '';
     document.getElementById('modalRestante').textContent = 'R$ ' + formatarBr(fiadoAtualTotal);
