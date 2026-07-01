@@ -31,20 +31,24 @@
     <h3>📋 Lista de Produtos</h3>
     <div id="listaProdutos" class="lista-produtos">
         {% for produto in produtos %}
-        <div class="produto-item" data-nome="{{ produto.nome.lower() }}">
+        <div class="produto-item" id="produto-{{ produto.id }}" data-nome="{{ produto.nome.lower() }}">
             <div class="produto-info">
                 <strong>{{ produto.nome }}</strong>
                 <span class="categoria">{{ produto.categoria }}</span>
             </div>
             <div class="produto-actions">
                 <span class="preco">R$ {{ produto.preco|moeda_br }}</span>
-                <button class="btn-icon" onclick="excluirProduto({{ produto.id }})">🗑️</button>
+                <button class="btn-icon btn-excluir" onclick="excluirProduto({{ produto.id }})" title="Excluir">🗑️</button>
             </div>
         </div>
         {% else %}
         <p class="empty">Nenhum produto cadastrado</p>
         {% endfor %}
     </div>
+</div>
+
+<div id="toast" class="toast" style="display:none;">
+    <span id="toastMsg"></span>
 </div>
 {% endblock %}
 
@@ -67,6 +71,21 @@ function parseBr(valorStr) {
     return parseFloat(valorStr.replace(/\./g, "").replace(",", "."));
 }
 
+function mostrarToast(msg, tipo) {
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    toastMsg.textContent = msg;
+    toast.className = 'toast toast-' + tipo;
+    toast.style.display = 'flex';
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            toast.style.display = 'none';
+            toast.style.opacity = '1';
+        }, 300);
+    }, 2500);
+}
+
 function salvarProduto() {
     const nome = document.getElementById('nomeProduto').value.trim();
     const preco = parseBr(document.getElementById('precoProduto').value);
@@ -85,19 +104,48 @@ function salvarProduto() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert('✅ Produto cadastrado!');
-            location.reload();
+            mostrarToast('✅ Produto cadastrado!', 'success');
+            setTimeout(() => location.reload(), 800);
         }
     });
 }
 
 function excluirProduto(id) {
-    if (!confirm('Tem certeza que deseja excluir?')) return;
+    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+
+    const item = document.getElementById('produto-' + id);
+    if (item) {
+        item.style.transition = 'all 0.4s ease';
+        item.style.transform = 'translateX(100%)';
+        item.style.opacity = '0';
+    }
 
     fetch('/api/produtos/' + id, {method: 'DELETE'})
     .then(r => r.json())
     .then(data => {
-        if (data.success) location.reload();
+        if (data.success) {
+            mostrarToast('🗑️ Produto excluído!', 'success');
+            setTimeout(() => {
+                if (item) item.remove();
+                const lista = document.getElementById('listaProdutos');
+                if (lista.children.length === 0) {
+                    lista.innerHTML = '<p class="empty">Nenhum produto cadastrado</p>';
+                }
+            }, 400);
+        } else {
+            mostrarToast('❌ Erro ao excluir', 'error');
+            if (item) {
+                item.style.transform = 'translateX(0)';
+                item.style.opacity = '1';
+            }
+        }
+    })
+    .catch(err => {
+        mostrarToast('❌ Erro na conexão', 'error');
+        if (item) {
+            item.style.transform = 'translateX(0)';
+            item.style.opacity = '1';
+        }
     });
 }
 

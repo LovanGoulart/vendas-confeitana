@@ -244,7 +244,7 @@ def api_vendas_dia(data):
 @app.route('/produtos')
 @login_required
 def produtos():
-    produtos = Produto.query.order_by(Produto.nome).all()
+    produtos = Produto.query.filter_by(ativo=True).order_by(Produto.nome).all()
     return render_template('produtos.html', produtos=produtos)
 
 @app.route('/api/produtos', methods=['POST'])
@@ -272,6 +272,14 @@ def api_produtos():
 def delete_produto(id):
     produto = Produto.query.get_or_404(id)
     produto.ativo = False
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/produtos/<int:id>/reativar', methods=['POST'])
+@login_required
+def reativar_produto(id):
+    produto = Produto.query.get_or_404(id)
+    produto.ativo = True
     db.session.commit()
     return jsonify({'success': True})
 
