@@ -4,58 +4,64 @@
 
 {% block content %}
 <div class="page-header">
-    <h2>🛒 Nova Venda</h2>
+    <h2>🛒 Vendas</h2>
 </div>
 
 <div class="card">
-    <div class="form-group">
-        <label>👤 Nome do Cliente</label>
-        <input type="text" id="clienteVenda" placeholder="Nome do cliente">
+    <div class="page-header" style="display:flex; justify-content:flex-start; align-items:center;">
+        <button class="btn btn-primary" style="background-color: white; color: black; font-size: 20px;" id="btnToggleNovaVenda" type="button" onclick="toggleNovaVenda();">➕ Nova Venda</button>
     </div>
 
-    <div class="form-group">
-        <label>📅 Data da Venda</label>
-        <input type="date" id="dataVendaInput" value="{{ data_iso }}">
-    </div>
-
-    <div class="form-group checkbox-group">
-        <label class="checkbox-label">
-            <input type="checkbox" id="vendaFiado" onchange="toggleFiado()">
-            <span class="checkmark"></span>
-            💳 Marcar como Fiado
-        </label>
-    </div>
-
-    <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
-
-    <h3>📦 Produtos da Venda</h3>
-
-    <div class="form-group">
-        <label>Adicionar Produto</label>
-        <div style="display: flex; gap: 10px;">
-            <select id="produtoSelect" style="flex: 1;" onchange="atualizarPrecoAdd()">
-                <option value="">Produto</option>
-                {% for produto in produtos %}
-                <option value="{{ produto.id }}" data-preco="{{ produto.preco }}" data-nome="{{ produto.nome }}">
-                    {{ produto.nome }} - R$ {{ produto.preco|moeda_br }}
-                </option>
-                {% endfor %}
-            </select>
-            <input type="number" id="qtdAdd" value="1" min="1" style="width: 50px;" placeholder="Qtd">
-            <button class="btn btn-success" onclick="adicionarProduto()">➕ Adicionar</button>
+    <div id="novaVendaConteudo" style="display:none; margin-top: 15px;">
+        <div class="form-group">
+            <label>👤 Nome do Cliente</label>
+            <input type="text" id="clienteVenda" placeholder="Nome do cliente">
         </div>
-    </div>
 
-    <div id="listaProdutosVenda" class="lista-produtos-venda" style="margin-top: 15px;">
-        <p class="empty" id="msgVazio">Nenhum produto adicionado</p>
-    </div>
+        <div class="form-group">
+            <label>📅 Data da Venda</label>
+            <input type="date" id="dataVendaInput" value="{{ data_iso }}">
+        </div>
 
-    <div class="total-preview" style="margin-top: 20px;">
-        <span>Total:</span>
-        <strong id="totalVenda">R$ 0,00</strong>
-    </div>
+        <div class="form-group checkbox-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="vendaFiado" onchange="toggleFiado()">
+                <span class="checkmark"></span>
+                💳 Marcar como Fiado
+            </label>
+        </div>
 
-    <button class="btn btn-success btn-full" id="btnSalvar" onclick="salvarVenda()">✅ Confirmar Venda</button>
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+
+        <h3>📦 Produtos da Venda</h3>
+
+        <div class="form-group">
+            <label>Adicionar Produto</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="produtoSelect" style="flex: 1;" onchange="atualizarPrecoAdd()">
+                    <option value="">Produto</option>
+                    {% for produto in produtos %}
+                    <option value="{{ produto.id }}" data-preco="{{ produto.preco }}" data-nome="{{ produto.nome }}">
+                        {{ produto.nome }} - R$ {{ produto.preco|moeda_br }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <input type="number" id="qtdAdd" value="1" min="1" style="width: 50px;" placeholder="Qtd">
+                <button class="btn btn-success" onclick="adicionarProduto()">➕ Adicionar</button>
+            </div>
+        </div>
+
+        <div id="listaProdutosVenda" class="lista-produtos-venda" style="margin-top: 15px;">
+            <p class="empty" id="msgVazio">Nenhum produto adicionado</p>
+        </div>
+
+        <div class="total-preview" style="margin-top: 20px;">
+            <span>Total:</span>
+            <strong id="totalVenda">R$ 0,00</strong>
+        </div>
+
+        <button class="btn btn-success btn-full" id="btnSalvar" onclick="salvarVenda()">✅ Confirmar Venda</button>
+    </div>
 </div>
 
 <div class="card">
@@ -72,8 +78,42 @@
 
 {% block scripts %}
 <script>
+// Verifica se veio com ?nova=1 na URL e expande o formulário automaticamente
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('nova') === '1') {
+        // Aguarda o DOM estar pronto e expande
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', abrirNovaVenda);
+        } else {
+            abrirNovaVenda();
+        }
+    }
+})();
+
 let produtosVenda = [];
 let vendaEditando = null;
+
+function toggleNovaVenda() {
+    const conteudo = document.getElementById('novaVendaConteudo');
+    const btn = document.getElementById('btnToggleNovaVenda');
+    const aberto = conteudo.style.display !== 'none';
+
+    if (aberto) {
+        conteudo.style.display = 'none';
+        btn.textContent = '➕ Nova Venda';
+    } else {
+        conteudo.style.display = 'block';
+        btn.textContent = '➖ Nova Venda';
+    }
+}
+
+function abrirNovaVenda() {
+    const conteudo = document.getElementById('novaVendaConteudo');
+    const btn = document.getElementById('btnToggleNovaVenda');
+    conteudo.style.display = 'block';
+    btn.textContent = '➖ Nova Venda';
+}
 
 function formatarBr(valor) {
     return valor.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -290,6 +330,8 @@ function editarVenda(id, cliente, produtoNome, valor, quantidade, dataIso, isFia
     renderizarProdutos();
 
     toggleFiado();
+
+    abrirNovaVenda();
 
     const btn = document.getElementById('btnSalvar');
     btn.textContent = '💾 Salvar Edicao';
