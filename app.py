@@ -218,59 +218,64 @@ def api_vendas():
 @login_required
 def api_editar_venda(id):
     data = request.get_json()
-    venda = Venda.query.get_or_404(id)
+    venda_original = Venda.query.get_or_404(id)
 
-    novo_fiado = data.get('fiado', venda.is_fiado)
-    fiado_mudou = (novo_fiado != venda.is_fiado)
+    is_fiado = data.get('fiado', venda_original.is_fiado)
+    produtos = data.get('produtos', [])
+    cliente = data.get('cliente', venda_original.cliente).strip().lower()
+    data_venda = data.get('data', venda_original.data)
+    data_iso = data.get('data_iso', venda_original.data_iso)
 
-    # Nao-fiado -> fiado: criar fiado
-    if fiado_mudou and novo_fiado and not venda.is_fiado:
-        fiado = Fiado(
-            cliente=data.get('cliente', venda.cliente).strip().lower(),
-            produto=data.get('produto_nome', venda.produto_nome),
-            valor=float(data.get('valor', venda.valor)),
-            quantidade=int(data.get('quantidade', venda.quantidade)),
-            total=float(data.get('total', venda.total)),
-            data=data.get('data', venda.data),
-            data_iso=data.get('data_iso', venda.data_iso),
-            pago=False
+    if not produtos:
+        return jsonify({'success': False, 'message': 'Nenhum produto informado'}), 400
+
+    # Remove o fiado antigo vinculado a esta venda, se existir
+    if venda_original.fiado_id:
+        fiado_antigo = Fiado.query.get(venda_original.fiado_id)
+        if fiado_antigo:
+            db.session.delete(fiado_antigo)
+
+    # Remove a venda original (sera recriada a partir da lista atual de produtos)
+    db.session.delete(venda_original)
+    db.session.flush()
+
+    vendas_criadas = []
+
+    for p in produtos:
+        venda = Venda(
+            produto_id=int(p.get('produto_id')),
+            produto_nome=p.get('produto_nome'),
+            cliente=cliente,
+            valor=float(p.get('valor', 0)),
+            quantidade=int(p.get('quantidade', 1)),
+            total=float(p.get('total', 0)),
+            data=data_venda,
+            data_iso=data_iso,
+            is_fiado=is_fiado,
+            fiado_id=None
         )
-        db.session.add(fiado)
+        db.session.add(venda)
         db.session.flush()
-        venda.fiado_id = fiado.id
 
-    # Fiado -> nao-fiado: remover fiado vinculado
-    if fiado_mudou and not novo_fiado and venda.is_fiado:
-        if venda.fiado_id:
-            fiado = Fiado.query.get(venda.fiado_id)
-            if fiado:
-                db.session.delete(fiado)
-        venda.fiado_id = None
+        if is_fiado:
+            fiado = Fiado(
+                cliente=cliente,
+                produto=p.get('produto_nome'),
+                valor=float(p.get('valor', 0)),
+                quantidade=int(p.get('quantidade', 1)),
+                total=float(p.get('total', 0)),
+                data=data_venda,
+                data_iso=data_iso,
+                pago=False
+            )
+            db.session.add(fiado)
+            db.session.flush()
+            venda.fiado_id = fiado.id
 
-    # Continua fiado, atualizar fiado vinculado
-    if venda.is_fiado and novo_fiado and not fiado_mudou:
-        if venda.fiado_id:
-            fiado = Fiado.query.get(venda.fiado_id)
-            if fiado:
-                fiado.cliente = data.get('cliente', venda.cliente).strip().lower()
-                fiado.produto = data.get('produto_nome', venda.produto_nome)
-                fiado.valor = float(data.get('valor', venda.valor))
-                fiado.quantidade = int(data.get('quantidade', venda.quantidade))
-                fiado.total = float(data.get('total', venda.total))
-                fiado.data = data.get('data', venda.data)
-                fiado.data_iso = data.get('data_iso', venda.data_iso)
-
-    venda.produto_nome = data.get('produto_nome', venda.produto_nome)
-    venda.cliente = data.get('cliente', venda.cliente).strip().lower()
-    venda.valor = float(data.get('valor', venda.valor))
-    venda.quantidade = int(data.get('quantidade', venda.quantidade))
-    venda.total = float(data.get('total', venda.total))
-    venda.data = data.get('data', venda.data)
-    venda.data_iso = data.get('data_iso', venda.data_iso)
-    venda.is_fiado = novo_fiado
+        vendas_criadas.append(venda.id)
 
     db.session.commit()
-    return jsonify({'success': True})
+    return jsonify({'success': True, 'vendas': vendas_criadas})
 
 @app.route('/api/vendas/<int:id>', methods=['DELETE'])
 @login_required
