@@ -8,20 +8,25 @@
 </div>
 
 <div class="card">
-    <h3>➕ Cadastrar Produto</h3>
-    <div class="form-group">
-        <label>🏷️ Nome do Produto</label>
-        <input type="text" id="nomeProduto" placeholder="Ex: Brigadeiro, Beijinho...">
+    <div class="page-header" style="display:flex; justify-content:flex-start; align-items:center;">
+        <button class="btn btn-primary" style="background-color: white; color: black; font-size: 20px;" id="btnToggleCadastro" type="button" onclick="toggleCadastro();">➕ Cadastrar Produto</button>
     </div>
-    <div class="form-group">
-        <label>💰 Preço (R$)</label>
-        <input type="text" id="precoProduto" placeholder="0,00" oninput="formatarInputMoeda(this)">
+
+    <div id="cadastroConteudo" style="display:none; margin-top: 15px;">
+        <div class="form-group">
+            <label>🏷️ Nome do Produto</label>
+            <input type="text" id="nomeProduto" placeholder="Ex: Brigadeiro, Beijinho...">
+        </div>
+        <div class="form-group">
+            <label>💰 Preço (R$)</label>
+            <input type="text" id="precoProduto" placeholder="0,00" oninput="formatarInputMoeda(this)">
+        </div>
+        <div class="form-group">
+            <label>📁 Categoria</label>
+            <input type="text" id="categoriaProduto" placeholder="Ex: Doces, Salgados, Bebidas...">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="salvarProduto()">💾 Salvar Produto</button>
     </div>
-    <div class="form-group">
-        <label>📁 Categoria</label>
-        <input type="text" id="categoriaProduto" placeholder="Ex: Doces, Salgados, Bebidas...">
-    </div>
-    <button class="btn btn-primary btn-full" onclick="salvarProduto()">💾 Salvar Produto</button>
 </div>
 
 <div class="card">
@@ -57,6 +62,20 @@
 
 {% block scripts %}
 <script>
+function toggleCadastro() {
+    const conteudo = document.getElementById('cadastroConteudo');
+    const btn = document.getElementById('btnToggleCadastro');
+    const aberto = conteudo.style.display !== 'none';
+
+    if (aberto) {
+        conteudo.style.display = 'none';
+        btn.textContent = '➕ Cadastrar Produto';
+    } else {
+        conteudo.style.display = 'block';
+        btn.textContent = '➖ Cadastrar Produto';
+    }
+}
+
 function formatarInputMoeda(input) {
     let valor = input.value.replace(/[^\d,]/g, "").replace(/\./g, "");
     if (valor.includes(",")) {

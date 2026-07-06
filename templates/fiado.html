@@ -7,7 +7,7 @@
     <h2>💳 Vendas Fiado</h2>
 </div>
 
-<!-- Resumo por Cliente -->
+<!-- Resumo por Cliente (SEMPRE EXPANDIDO) -->
 <div class="card">
     <h3>📊 Resumo por Cliente</h3>
     <div id="listaResumoClientes" class="lista-resumo-clientes">
@@ -69,30 +69,35 @@
     </div>
 </div>
 
-<!-- Contas Pagas -->
+<!-- Contas Pagas (EXPANDIR/RECOLHER) -->
 <div class="card">
-    <h3>✅ Contas Pagas</h3>
-    <div class="lista-fiado">
-        {% set tem_pago = false %}
-        {% for fiado in fiados %}
-        {% if fiado.pago %}
-        {% set tem_pago = true %}
-        <div class="fiado-item pago" data-cliente="{{ fiado.cliente.lower() }}">
-            <div class="fiado-info">
-                <strong>{{ fiado.cliente.title() }}</strong>
-                <span>{{ fiado.produto }} - {{ fiado.quantidade }}x</span>
-                <span class="fiado-data">Pago em: {{ fiado.data_pagamento }}</span>
+    <div class="page-header" style="display:flex; justify-content:flex-start; align-items:center;">
+        <button class="btn btn-primary" style="background-color: white; color: black; font-size: 20px;" id="btnTogglePagas" type="button" onclick="togglePagas();">➕ Contas Pagas</button>
+    </div>
+
+    <div id="pagasConteudo" style="display:none; margin-top: 15px;">
+        <div class="lista-fiado">
+            {% set tem_pago = false %}
+            {% for fiado in fiados %}
+            {% if fiado.pago %}
+            {% set tem_pago = true %}
+            <div class="fiado-item pago" data-cliente="{{ fiado.cliente.lower() }}">
+                <div class="fiado-info">
+                    <strong>{{ fiado.cliente.title() }}</strong>
+                    <span>{{ fiado.produto }} - {{ fiado.quantidade }}x</span>
+                    <span class="fiado-data">Pago em: {{ fiado.data_pagamento }}</span>
+                </div>
+                <div class="fiado-actions">
+                    <span class="fiado-valor">R$ {{ fiado.total|moeda_br }}</span>
+                    <button class="btn-icon" onclick="excluirFiado({{ fiado.id }})" title="Excluir">🗑️</button>
+                </div>
             </div>
-            <div class="fiado-actions">
-                <span class="fiado-valor">R$ {{ fiado.total|moeda_br }}</span>
-                <button class="btn-icon" onclick="excluirFiado({{ fiado.id }})" title="Excluir">🗑️</button>
-            </div>
+            {% endif %}
+            {% endfor %}
+            {% if not tem_pago %}
+            <p class="empty">Nenhuma conta paga</p>
+            {% endif %}
         </div>
-        {% endif %}
-        {% endfor %}
-        {% if not tem_pago %}
-        <p class="empty">Nenhuma conta paga</p>
-        {% endif %}
     </div>
 </div>
 
@@ -131,6 +136,21 @@
 // ============== VARIAVEIS GLOBAIS ==============
 var fiadoAtualId = null;
 var fiadoAtualTotal = 0;
+
+// ============== TOGGLE CONTAS PAGAS ==============
+function togglePagas() {
+    const conteudo = document.getElementById('pagasConteudo');
+    const btn = document.getElementById('btnTogglePagas');
+    const aberto = conteudo.style.display !== 'none';
+
+    if (aberto) {
+        conteudo.style.display = 'none';
+        btn.textContent = '➕ Contas Pagas';
+    } else {
+        conteudo.style.display = 'block';
+        btn.textContent = '➖ Contas Pagas';
+    }
+}
 
 // ============== FUNCOES AUXILIARES ==============
 function formatarMoedaInput(input) {
