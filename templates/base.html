@@ -9,6 +9,11 @@
 <body>
     {% if session.get('logged_in') %}
     <nav class="menu-inferior">
+        <!-- 🏠 Início: vai para vendas.html com formulário recolhido -->
+        <a href="{{ url_for('vendas') }}" class="menu-item {% if request.endpoint == 'vendas' %}active{% endif %}">
+            <span class="menu-icon">🏠</span>
+            <span class="menu-label">Início</span>
+        </a>
         <a href="{{ url_for('produtos') }}" class="menu-item {% if request.endpoint == 'produtos' %}active{% endif %}">
             <span class="menu-icon">📦</span>
             <span class="menu-label">Produtos</span>
@@ -21,8 +26,10 @@
             <span class="menu-icon">💳</span>
             <span class="menu-label">Fiado</span>
         </a>
-        <a href="{{ url_for('vendas') }}" class="menu-item" title="Nova Venda">
+        <!-- ➕ Nova Venda: vai para vendas.html com formulário expandido -->
+        <a href="{{ url_for('vendas') }}?nova=1" class="menu-item" title="Nova Venda">
             <span class="menu-icon">➕</span>
+            <span class="menu-label">Nova</span>
         </a>
     </nav>
     {% endif %}

@@ -78,6 +78,19 @@
 
 {% block scripts %}
 <script>
+// Verifica se veio com ?nova=1 na URL e expande o formulário automaticamente
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('nova') === '1') {
+        // Aguarda o DOM estar pronto e expande
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', abrirNovaVenda);
+        } else {
+            abrirNovaVenda();
+        }
+    }
+})();
+
 let produtosVenda = [];
 let vendaEditando = null;
 
