@@ -436,7 +436,29 @@ def api_relatorios_ano(ano):
 @app.route('/fiado')
 @login_required
 def fiado():
-    fiados = Fiado.query.order_by(Fiado.created_at.desc()).all()
+    todos = Fiado.query.all()
+    
+    # Separa abertos e pagos
+    abertos = [f for f in todos if not f.pago]
+    pagos = [f for f in todos if f.pago]
+    
+    # Abertos: mantém ordem original (created_at desc)
+    abertos.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
+    
+    # Pagos: ordena por data_pagamento (dd/mm/yyyy -> datetime) decrescente
+    def _dt_pagamento(f):
+        if f.data_pagamento:
+            try:
+                return datetime.strptime(f.data_pagamento, '%d/%m/%Y')
+            except ValueError:
+                return datetime.min
+        return datetime.min
+    
+    pagos.sort(key=_dt_pagamento, reverse=True)
+    
+    # Junta: abertos primeiro, pagos depois
+    fiados = abertos + pagos
+    
     return render_template('fiado.html', fiados=fiados)
 
 @app.route('/api/fiado', methods=['POST'])
